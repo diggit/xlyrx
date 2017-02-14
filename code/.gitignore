@@ -1,0 +1,14 @@
+*.elf
+*.gck
+*.o
+*.hex
+*.bin
+
+*.gch
+
+.gdb_history
+.gcc-flags.json
+
+size.log
+
+unused/

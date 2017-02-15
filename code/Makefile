@@ -28,9 +28,9 @@ JOBS			= 9
 SIZE_HISTORY	= size.log
 BUILD_NUM		= $(shell wc -l $(SIZE_HISTORY)|cut -d " " -f1)
 
-export CFLAGS		= -D'BUILD=$(BUILD_NUM)' -c -Wunused -Wall -Wstrict-prototypes -Wundef -Werror -pedantic -g -O$(OPTIMIZE) -I./ -mcpu=cortex-m3 -mthumb -flto -funsigned-char -funsigned-bitfields -fpack-struct -fdata-sections -ffunction-sections -fdiagnostics-color=always -std=gnu99
+export CFLAGS		= -D'BUILD=$(BUILD_NUM)' -c -Wunused -Wall -Wstrict-prototypes -Wundef -Werror -pedantic -g -O$(OPTIMIZE) -I./ -mcpu=cortex-m3 -mthumb -funsigned-char -funsigned-bitfields -fpack-struct -fdata-sections -ffunction-sections -fdiagnostics-color=always -std=gnu99
 # -mcall-prologues
-LDFLAGS			= -mcpu=cortex-m3 -mthumb -O$(OPTIMIZE) -nostartfiles -flto -fdiagnostics-color=always -Wl,--gc-sections -T$(LSCRIPT)
+LDFLAGS			= -mcpu=cortex-m3 -mthumb -O$(OPTIMIZE) -nostartfiles -fdiagnostics-color=always -Wl,--gc-sections -T$(LSCRIPT)
 TARGET			= main
 
 

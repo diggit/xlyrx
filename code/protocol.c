@@ -16,37 +16,18 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#include "protocol.h"
+//most protocol knowledge was gathered from https://www.rcgroups.com/forums/showthread.php?1667453-DIY-FrSky-RX
+//thank you guys!
 
+#include "protocol.h"
 #include "cc2500.h"
 #include "misc.h"
 #include "flash.h"
-
 #include "uart.h"
 #include "timers.h"
 
-/*
-(HTI - Hop Table Index, RI - RSSI)
-LEN|ADR ID|TX  ID |HTI| h1| h2| h2| h4| h5| NUL|NUL|NUL|NUL|NUL|NUL| ?| RI| PQI
-17   3   1 168 237   0   0 145  55 200 110   0   0   0   0   0   0  34  60 195
-17   3   1 168 237   5  20 165  75 221 130   0   0   0   0   0   0  34  59 204
-17   3   1 168 237  10  40 185  95   5 150   0   0   0   0   0   0  34  59 201
-17   3   1 168 237  15  60 205 115  25 170   0   0   0   0   0   0  34  60 201
-17   3   1 168 237  20  80 225 135  45 190   0   0   0   0   0   0  34  60 200
-17   3   1 168 237  25 100  10 155  65 210   0   0   0   0   0   0  34  59 200
-17   3   1 168 237  30 120  30 175  85 230   0   0   0   0   0   0  34  59 197
-17   3   1 168 237  35 140  50 195 105  15   0   0   0   0   0   0  34  59 199
-17   3   1 168 237  40 160  70 215 125  35   0   0   0   0   0   0  34  60 200
-17   3   1 168 237  45 180  91  34   0   0   0   0   0   0   0   0  34  60 206
-
-221 and 91 are out of +=5 rule, 220 and 90 are not used, hmmm...
-34 is not channel, CRC?
-
-235 seems to be excluded top channel -> 47 uniqu channels
-*/
-
-
 uint8_t frsky_channel_data[FRSKY_CHANNEL_COUNT][4];//channel, FSCAL3, FSCAL2, FSCAL1
+
 union frsky_id
 {
 	uint16_t id;
@@ -57,11 +38,8 @@ union frsky_id
 	}nibble;
 };
 
-
-
 union frsky_id frsky_tx_id={.id=0};//set default ID to 0, means not yet set
-
-
+//in fact, this id is id of link between RX and TX, TX requires same ID in telemetry packets
 
 
 //OFFSET CALIBRATION
@@ -85,29 +63,25 @@ void protocol_frsky_calibrate_offset_next(void)
 		//first packet was received
 		offset_cal_table_idx=INT8_MIN;
 		offset_cal_status=FRSKY_OFFSET_CAL_MEASURING;
-		uart_send_string_blocking("here we go!\n");
+		uart_send_string_blocking("TX found, searching frequency offset...\n");
 	}
 	else
 	{
 		if(offset_cal_table_idx<INT8_MAX)
 		{
-			//request to try next offset
-			// uart_send_string_blocking("setting next\n");
 			offset_cal_table_idx++;
 			cc2500_write_reg(CC2500_FSCTRL0, (uint8_t)offset_cal_table_idx);
 		}
 		else if(offset_cal_status==FRSKY_OFFSET_CAL_MEASURING)//end and we were measuring
 		{
-			// uart_send_string_blocking("FINISHED\n");
 			swdt_stop();
 			cc2500_reset_callback(GDO0);
 			offset_cal_status=FRSKY_OFFSET_CAL_FINISHED;
 			cc2500_strobe(CC2500_SIDLE);
 			return;
 		}
-		else//end, but we have not measured yet
+		else//end of sweep cycle, but we have not found TX yet
 		{
-			// uart_send_string_blocking("cycle restart\n");
 			offset_cal_table_idx=INT8_MIN;
 		}
 	}
@@ -116,7 +90,7 @@ void protocol_frsky_calibrate_offset_next(void)
 	cc2500_strobe(CC2500_SCAL);
 	delay_ms(1);
 	cc2500_strobe(CC2500_SRX);
-	swdt_restart(30*SWDT_1ms);
+	swdt_restart(30*SWDT_1ms);//some reasonable time in which valid packed should appear, when offset is close to ideal
 }
 
 void protocol_frsky_calibrate_offset_rxed_callback(void)
@@ -125,7 +99,6 @@ void protocol_frsky_calibrate_offset_rxed_callback(void)
 	uint8_t bytes = cc2500_read_fifo(packet);
 	if(offset_cal_status==FRSKY_OFFSET_CAL_WAITING)
 	{
-		// uart_send_string_blocking("FIRST HIT\n");
 		offset_cal_status=FRSKY_OFFSET_CAL_START;//finally some packet arrived
 	}
 	else
@@ -133,7 +106,7 @@ void protocol_frsky_calibrate_offset_rxed_callback(void)
 		offset_cal_table[(uint8_t)offset_cal_table_idx]=packet[FRSKY_PKT_INX_RSSI(packet[FRSKY_BIND_INX_LENGTH])];
 		uart_send_string_blocking("OFS: ");
 		uart_send_string_blocking(itoa(offset_cal_table_idx,4));
-		uart_send_string_blocking("RSSI: ");
+		uart_send_string_blocking(" RSSI: ");
 		uart_send_string_blocking(itoa(offset_cal_table[(uint8_t)offset_cal_table_idx],4));
 		for(uint8_t i=0; i<bytes; i++)
 		{
@@ -144,11 +117,8 @@ void protocol_frsky_calibrate_offset_rxed_callback(void)
 	protocol_frsky_calibrate_offset_next();
 }
 
-void protocol_frsky_calibrate_offset_timeout_callback(void)
+void protocol_frsky_calibrate_offset_timeout_callback(void)//nothing received with set offset, just move on...
 {
-	// uart_send_string_blocking("OFS: ");
-	// uart_send_string_blocking(itoa(offset_cal_table_idx,4));
-	// uart_send_string_blocking("NOTHING\n");
 	offset_cal_table[(uint8_t)offset_cal_table_idx]=0;
 	protocol_frsky_calibrate_offset_next();
 }
@@ -166,9 +136,10 @@ void protocol_frsky_calibrate_offset_start(void)
 	cc2500_ex_lna(0);
 
 	cc2500_strobe(CC2500_SIDLE);
-	cc2500_write_reg(CC2500_IOCFG0, 0x06);//GDO to indicate facket processing end
-	cc2500_write_reg(CC2500_ADDR, 3);//address in bind mode
-	cc2500_set_channel(0);
+	//TODO? use pin mode 0x01
+	cc2500_write_reg(CC2500_IOCFG0, 0x06);//GDO to indicate packet processing end
+	cc2500_write_reg(CC2500_ADDR, FRSKY_BIND_ADDRESS );//address in bind mode
+	cc2500_set_channel(FRSKY_BIND_CHANNEL);
 
 	uint8_t MDMCFG4_backup = cc2500_read_reg(CC2500_MDMCFG4);//backup seetings
 	cc2500_write_reg(CC2500_MDMCFG4, 0xCA);//decrease channel width
@@ -188,7 +159,6 @@ void protocol_frsky_calibrate_offset_start(void)
 
 	cc2500_write_reg(CC2500_FOCCFG, 0x00);
 
-	uart_send_string_blocking("measured!\n");
 	//find band where rssi is above threshold and set offset of middle of this band
 
 	uint8_t max=0;
@@ -225,11 +195,11 @@ void protocol_frsky_calibrate_offset_start(void)
 
 	uart_send_string_blocking("mid: ");
 	uart_send_string_blocking(itoa(mid,3));
-	uart_send_string_blocking("RSSI: ");
+	uart_send_string_blocking(" RSSI: ");
 	uart_send_string_blocking(itoa(offset_cal_table[(uint8_t)mid],3));
 	uart_send_byte_blocking('\n');
 
-	cc2500_write_reg(CC2500_FSCTRL0,offset_cal_table[(uint8_t)mid]);//set offse we calculated as best
+	cc2500_write_reg(CC2500_FSCTRL0,offset_cal_table[(uint8_t)mid]);//set offset we calculated as best
 
 	cc2500_write_reg(CC2500_MDMCFG4, MDMCFG4_backup);//restore register contents
 	cc2500_write_reg(CC2500_FOCCFG, FOCCFG_backup);//restore register contents
@@ -237,12 +207,13 @@ void protocol_frsky_calibrate_offset_start(void)
 
 //config storing
 
+//we basically use last FLASH page (1kiB) to store our binding data
 int8_t protocol_frsky_write_nvm(void)
 {
 	uart_send_string_blocking("SAVING CONFIG...\n");
 	uint16_t *destination=(uint16_t*)FLASH_PAGE_ADDR(FLASH_PAGE_LAST);
 	flash_unlock();
-	flash_page_erase(destination);
+	flash_page_erase(destination);//erase is necessary to be able to write new data
 	//some header
 	flash_write(destination++, MEM_MAGIC);
 	flash_write(destination++, MEM_VERSION);
@@ -253,17 +224,14 @@ int8_t protocol_frsky_write_nvm(void)
 	//hop table
 	for(uint8_t ch=0; ch<FRSKY_CHANNEL_COUNT; ch++)
 	{
-		flash_write(destination++,frsky_channel_data[ch][0]);//yep bytes and we store them to words, and what.... :D
+		flash_write(destination++,frsky_channel_data[ch][0]);//yep bytes and we store them to words, and what.... :D (this could be optimized)
 	}
-
 	return 0;
 }
 
 int8_t protocol_frsky_read_nvm(void)
 {
 	uint16_t buffer;
-
-
 
 	uart_send_string_blocking("LOADING...\n");
 	uint16_t *destination=(uint16_t*)FLASH_PAGE_ADDR(FLASH_PAGE_LAST);
@@ -293,9 +261,27 @@ int8_t protocol_frsky_read_nvm(void)
 }
 
 
-
-
 //BINDING
+
+/*
+(HTI - Hop Table Index, RI - RSSI)
+LEN|ADR ID|TX  ID |HTI| h1| h2| h2| h4| h5| NUL|NUL|NUL|NUL|NUL|NUL| ?| RI| PQI
+17   3   1 168 237   0   0 145  55 200 110   0   0   0   0   0   0  34  60 195
+17   3   1 168 237   5  20 165  75 221 130   0   0   0   0   0   0  34  59 204
+17   3   1 168 237  10  40 185  95   5 150   0   0   0   0   0   0  34  59 201
+17   3   1 168 237  15  60 205 115  25 170   0   0   0   0   0   0  34  60 201
+17   3   1 168 237  20  80 225 135  45 190   0   0   0   0   0   0  34  60 200
+17   3   1 168 237  25 100  10 155  65 210   0   0   0   0   0   0  34  59 200
+17   3   1 168 237  30 120  30 175  85 230   0   0   0   0   0   0  34  59 197
+17   3   1 168 237  35 140  50 195 105  15   0   0   0   0   0   0  34  59 199
+17   3   1 168 237  40 160  70 215 125  35   0   0   0   0   0   0  34  60 200
+17   3   1 168 237  45 180  91  34   0   0   0   0   0   0   0   0  34  60 206
+
+221 and 91 are out of +=5 rule, 220 and 90 are not used, hmmm...
+34 is not channel because we use ch. 35 (too close), CRC?
+
+235 seems to be top channel (excluded) -> 47 unique channels
+*/
 
 #define FRSKY_HOP_TABLE_COMPLETE		0x03FF	//bitewise flags of received hop table groups
 #define FRSKY_HOP_TABLE_VALID			0xFFFF	//signal to finish binding a continue in prg. exec.
@@ -308,13 +294,11 @@ void protocol_frsky_bind_finished(void)
 {
 	cc2500_strobe(CC2500_SIDLE);//stop RX
 	cc2500_reset_callback(GDO0);
-	uart_send_string_blocking("HOP channels:\n");
+	uart_send_string_blocking("HOP sequence:\n");
 	for (uint8_t i = 0; i < FRSKY_CHANNEL_COUNT; i++)
 	{
 		uart_send_string_blocking(itoa(frsky_channel_data[i][0],3));
-		uart_send_byte_blocking('\n');
 	}
-	uart_send_string_blocking("END\n");
 	frsky_hop_channels=FRSKY_HOP_TABLE_VALID;
 }
 
@@ -327,10 +311,6 @@ void protocol_frsky_bind_process_packet(void)
 	uart_send_string_blocking("LEN:");
 	uart_send_string_blocking(itoa(packet[FRSKY_BIND_INX_LENGTH],3));
 	uart_send_byte_blocking('\n');
-	// for(uint8_t i=0; i<packet[FRSKY_BIND_INX_LENGTH]; i++)
-	// {
-	// 	uart_send_string_blocking(itoa(packet[i],4));
-	// }
 	uart_send_byte_blocking('\n');
 	//parse TX ID
 	union frsky_id IDbuff;
@@ -341,7 +321,7 @@ void protocol_frsky_bind_process_packet(void)
 	{
 		frsky_tx_id.id=IDbuff.id;
 		frsky_hop_channels=0;
-		uart_send_string_blocking("ID LEARNED");
+		uart_send_string_blocking("ID LEARNED\n");
 	}
 
 	if(frsky_tx_id.id==IDbuff.id)
@@ -357,40 +337,34 @@ void protocol_frsky_bind_process_packet(void)
 				if(hti+index < FRSKY_CHANNEL_COUNT)
 					frsky_channel_data[hti+index][0]=packet[FRSKY_BIND_INX_HOP1+index];//save channel number to channel config table
 			}
-			frsky_hop_channels|=(1<<(packet[FRSKY_BIND_INX_HTI]/5));//mark as set
+			frsky_hop_channels|=(1<<(packet[FRSKY_BIND_INX_HTI]/5));//mark group as set
 		}
 	}
 
 }
 
-void protocol_frsky_bind_start(void)
+void protocol_frsky_bind(void)
 {
-	uart_send_string_blocking("BIND...\n");
-	frsky_tx_id.id=0;//protocol_frsky_bind_process_packet will parse ID when frsky_tx_id.id==0
+	uart_send_string_blocking("BINDING...\n");
+	frsky_tx_id.id=0;//protocol_frsky_bind_process_packet will parse ID when frsky_tx_id.id==0 or matching non zero value -> clear value to zero
 	frsky_hop_channels=0;
 	cc2500_strobe(CC2500_SIDLE);
-	cc2500_write_reg(CC2500_FIFOTHR, 7);//5 ~ 24+ bytes in RXFIFO to trigger -> triggered
-	cc2500_write_reg(CC2500_IOCFG0, 0x01);//GDO to indicate packet processing end
-	cc2500_write_reg(CC2500_ADDR, 3);//address in bind mode
-	cc2500_set_channel(0);
-	cc2500_strobe(CC2500_SCAL);
+	cc2500_write_reg(CC2500_FIFOTHR, 7);//more bytes than correct packet in RXFIFO to trigger -> triggered only by correct packets received, this way, we have least false positive interrupts from cc2500
+	cc2500_write_reg(CC2500_IOCFG0, 0x01);//GDO to indicate packet processing end (or RXFIFO threshold crossed)
+	cc2500_write_reg(CC2500_ADDR, FRSKY_BIND_ADDRESS );//address in bind mode
+	cc2500_set_channel(FRSKY_BIND_CHANNEL);//all binding happens on channel 0 :/
+	cc2500_strobe(CC2500_SCAL);//calibrate for this frequency (just for sure if no autocal enabled)
 	delay_ms(1);//I hope it is enough, polling MARCSTATE fro IDLE state is the other way
 	cc2500_set_callback(GDO0, RISING, protocol_frsky_bind_process_packet, NOT_EMPTY);//set callback on GDO0
-	//set timeout callback, when packet is missing
 	cc2500_strobe(CC2500_SRX);
-	uart_send_string_blocking("STAT: ");
-	uart_send_string_blocking(itoa(cc2500_status.byte,3));
-	uart_send_byte_blocking('\n');
-}
 
-void protocol_frsky_bind_run_blocking(void)
-{
-	protocol_frsky_bind_start();
 	while(frsky_hop_channels!=FRSKY_HOP_TABLE_VALID)
 		NOP;
+	uart_send_string_blocking("BINDING finished!\n");
 }
 
-void protocol_frsky_calibrate_channels(void)//to avoid waiting for PLL settlement after every hop
+//to avoid waiting for PLL settlement after every hop, precalibrate all channels, might be necessary to recalibrate during runtime
+void protocol_frsky_calibrate_channels(void)
 {
 
 	cc2500_strobe(CC2500_SIDLE);
@@ -438,7 +412,7 @@ void protocol_frsky_hop(uint8_t hops)
 	// uart_send_byte_blocking('\n');
 }
 
-
+//extract ppm data from packets
 void protocol_frsky_extract(uint8_t *packet,uint16_t *channel_buffer)
 {
 	channel_buffer[0]=\
@@ -475,7 +449,7 @@ void protocol_frsky_extract(uint8_t *packet,uint16_t *channel_buffer)
 	((uint16_t)packet[FRSKY_2W_RX_IDX_CH8_LSB]);
 }
 
-
+//describes expected event
 volatile enum frsky_state
 {
 	NOSYNC,
@@ -502,21 +476,12 @@ void protocol_frsky_packet_send(void)
 	packet[FRSKY_2W_TX_IDX_A2]=200;
 	packet[FRSKY_2W_TX_IDX_RX_RSSI]=frsky_last_rssi/2;
 	cc2500_write_fifo(packet, FRSKY_2W_TX_LENGTH+1);
-	uart_send_string_blocking("TX: ");
-	uart_send_string_blocking(itoa(cc2500_read_reg(CC2500_TXBYTES),4));
-	uart_send_byte_blocking('\n');
-	delay_us(500);
-	// for(uint8_t i=0; i<FRSKY_2W_TX_LENGTH+1; i++)
-	// {
-	// 	uart_send_string_blocking(itoa(packet[i],4));
-	// }
+	delay_us(1000);//delay when it works.. TODO: turn delay into timeout action
 	cc2500_mode_tx();
-
-
 }
 
 volatile uint8_t packets_lost=0;
-volatile uint8_t lna_active=0;
+volatile uint8_t lna_state=0;
 
 void protocol_frsky_packet_rxed_callback(void)
 {
@@ -531,17 +496,17 @@ void protocol_frsky_packet_rxed_callback(void)
 			cc2500_strobe(CC2500_SFRX);
 			cc2500_mode_rx(0);
 		}
-		uart_send_string_blocking("LE: ");
+		uart_send_string_blocking("LE: ");//packet length error
 		uart_send_string_blocking(itoa(bytes,2));
 		uart_send_byte_blocking('\n');
-		return;//won't restart swdt, that will end as TimeOut
+		return;//won't restart swdt, that will result as TimeOut
 	}
 
 
-	uart_send_string_blocking(itoa(swdt_get(),4));
+	// uart_send_string_blocking(itoa(swdt_get(),4));
 	swdt_restart(FRSKY_PACKET_TIMEOUT);
 	protocol_frsky_hop(1);
-	uart_send_string_blocking(" RX ");
+	// uart_send_string_blocking(" RX ");
 	packets_lost=0;
 
 
@@ -553,20 +518,13 @@ void protocol_frsky_packet_rxed_callback(void)
 	{
 		uart_send_string_blocking("TXID mismatch!\n");
 		//kinda WTF, packet passed address: test, CRC check, length check and second byte of address is not matching?!
-		return;//won't restart swdt, that will end as TimeOut
+		return;//won't restart swdt, that will result as TimeOut
 	}
 
-	// for(uint8_t i=0; i<FRSKY_2W_TX_LENGTH+1; i++)
-	// {
-	// 	uart_send_string_blocking(itoa(packet[i],4));
-	// }
-	// uart_send_byte_blocking('\n');
-
-
-	//packet was probably valid, continue processing...
-	uart_send_string_blocking("OK ");
+	//YAY! packet was probably valid, continue processing...
 	switch (frsky_state)
 	{
+		//expected packed and we goot it
 		case RX_PKT1:
 		case RX_PKT2:
 		case RX_PKT3:
@@ -574,50 +532,43 @@ void protocol_frsky_packet_rxed_callback(void)
 			break;
 
 		case TX_PKT:
+			//telemetry packet shoul have been sent, but we got packet incomming, weitd situation
 			frsky_state=RX_PKT1;
-			uart_send_string_blocking("wrooooong! ");
+			uart_send_string_blocking("RXed while TXing!\n");
 			break;
 
 		case NOSYNC:
 			break;
 	}
 
-	//sync your state machine with packet from packet id 0,1,2,(3),4,5,6,(7),...
+	//sync state machine with packet from packet id 0,1,2,(3),4,5,6,(7),...
 	uint8_t newstate=packet[FRSKY_2W_RX_IDX_PKT_ID]%4 + RX_PKT1 +1;
 	if(frsky_state != newstate)
 	{
-		uart_send_string_blocking("Qs ");
+		// uart_send_string_blocking("Qs ");
 		frsky_state = newstate;
 	}
 
-	frsky_last_rssi=(int16_t)(int8_t)packet[FRSKY_PKT_INX_RSSI(FRSKY_2W_TX_LENGTH)]-INT8_MIN;
-	uart_send_string_blocking("RS: ");
-	uart_send_string_blocking(itoa(frsky_last_rssi,3));
-	// uart_send_byte_blocking('\n');
+	frsky_last_rssi=(int16_t)(int8_t)packet[FRSKY_PKT_INX_RSSI(FRSKY_2W_TX_LENGTH)]-INT8_MIN;//save RSSI value, we might need it in telemetry packet
 
-	if(frsky_last_rssi > FRSKY_RSSI_MAX)
+	//disable LNA if RSSI gets too high (RX saturation)
+	if(frsky_last_rssi > FRSKY_RSSI_MAX && lna_state!=0 )
 	{
-		// uart_send_string_blocking("LNA OFF\n");
-		lna_active=0;
+		lna_state=0;
+		uart_send_string_blocking("LNA OFF\n");
 	}
 
-	else if(frsky_last_rssi < FRSKY_RSSI_MIN)
+	//enable LNA when RSSI is low enough
+	else if(frsky_last_rssi < FRSKY_RSSI_MIN && lna_state==0 )
 	{
-		// uart_send_string_blocking("LNA ON\n");
-		lna_active=1;
+		uart_send_string_blocking("LNA ON\n");
+		lna_state=1;
 	}
-	uart_send_string_blocking("LNA: ");
-	uart_send_string_blocking(itoa(lna_active,1));
-	// for(uint8_t i=0; i<bytes; i++)
-	// {
-	// 	uart_send_string_blocking(itoa(packet[i],4));
-	// }
-	uart_send_byte_blocking('\n');
 
+	//set received data to ppm outputs
 	uint16_t channels[8];
 	protocol_frsky_extract(packet, channels);
-	ppm_set_ticks(1500, 3000, channels);
-
+	ppm_set_ticks(FRSKY_1ms, FRSKY_2ms, channels);
 
 	if(frsky_state==TX_PKT)
 	{
@@ -625,15 +576,13 @@ void protocol_frsky_packet_rxed_callback(void)
 	}
 	else
 	{
-		cc2500_mode_rx(lna_active);
+		cc2500_mode_rx(lna_state);//set correct LNA state and set cc2500 to RX mode
 	}
 }
 
+//when packet does not arrive
 void protocol_frsky_packet_timeout_callback(void)
 {
-	uart_send_string_blocking(" TO ");
-	// uart_send_string_blocking(itoa(TIM1->CNT,6));
-	// uart_send_byte_blocking(' ');
 	if(packets_lost>=FRSKY_PACKETS_LOST_RESYNC_THRESHOLD || frsky_state==NOSYNC)
 	{
 		frsky_state=NOSYNC;
@@ -642,12 +591,7 @@ void protocol_frsky_packet_timeout_callback(void)
 		uart_send_string_blocking("NOSYNC CH: ");
 		uart_send_string_blocking(itoa(frsky_channel_data[frsky_channel_index][0], 3));
 		uart_send_byte_blocking('\n');
-		swdt_restart(FRSKY_CYCLE_TIMEOUT*3);
-		cc2500_strobe(CC2500_SNOP);
-		uart_send_string_blocking("STAT: ");
-		uart_send_string_blocking(itoa(cc2500_status.byte,3));
-		uart_send_byte_blocking('\n');
-
+		swdt_restart(FRSKY_CYCLE_TIMEOUT*3);//n times higher TO than full cycle to not run ahead/after TX and sync soon
 	}
 	else
 	{
@@ -655,34 +599,32 @@ void protocol_frsky_packet_timeout_callback(void)
 		swdt_restart(FRSKY_PACKET_TIMEOUT);
 		switch(frsky_state)
 		{
-
+			//expected packet from TX, but nothing arrived in time
 			case RX_PKT1:
 			case RX_PKT2:
 			case RX_PKT3:
 				packets_lost++;
-				uart_send_string_blocking(itoa(frsky_channel_data[frsky_channel_index][0],3));
-				uart_send_string_blocking(" !\n");
 				break;
 
 			case TX_PKT:
-				uart_send_string_blocking("OK\n");
 				frsky_state=RX_PKT1;
 				break;
 
 			case NOSYNC:
 				break;
 		}
-		cc2500_mode_rx(lna_active);
+		cc2500_mode_rx(lna_state);
 	}
 }
 
 void protocol_frsky_start(uint8_t force_bind)
 {
 	protocol_frsky_init();
-	if( force_bind || protocol_frsky_read_nvm()<0 )
+	//read config from flash
+	if( force_bind || protocol_frsky_read_nvm()<0 )//if no valid data found
 	{
 		protocol_frsky_calibrate_offset_start();
-		protocol_frsky_bind_run_blocking();
+		protocol_frsky_bind();
 		protocol_frsky_write_nvm();
 	}
 	else
@@ -693,84 +635,60 @@ void protocol_frsky_start(uint8_t force_bind)
 	frsky_state=NOSYNC;
 	cc2500_strobe(CC2500_SIDLE);
 	protocol_frsky_calibrate_channels();
-	cc2500_write_reg(CC2500_ADDR, frsky_tx_id.nibble.high);
-	swdt_set_callback(					protocol_frsky_packet_timeout_callback);
+	cc2500_write_reg(CC2500_ADDR, frsky_tx_id.nibble.high);//hw can check only 1 byte of 2 byte ID, second part is checked by SW (just for sure)
 	cc2500_set_callback(GDO0, RISING,	protocol_frsky_packet_rxed_callback, NOT_EMPTY);//set intterupt on falling edge of GDO0
 	cc2500_write_reg(CC2500_FOCCFG, 0x16);//enable frequecy autotune
 	cc2500_write_reg(CC2500_IOCFG0, 0x01);
 	cc2500_write_reg(CC2500_FIFOTHR, 7);//5 ~ 24+ bytes in RXFIFO to trigger -> troggered on pkt end only
 	protocol_frsky_hop(0);//load channel config
-	cc2500_mode_rx(1);//TODO: on/off lna?
-	swdt_restart(FRSKY_CYCLE_TIMEOUT);
-
+	cc2500_mode_rx(1);//LNA state should not matter, will be tuned dynamically
+	swdt_set_callback(protocol_frsky_packet_timeout_callback);//callback, when timeout occurs
+	swdt_restart(FRSKY_CYCLE_TIMEOUT);//run!
 }
 
 
 
 void protocol_frsky_init(void)
 {
-	// 00 - (0x30) RESET
 	cc2500_strobe(CC2500_SRES);
 	delay_ms(2);
-	// 03 - (0x17 0x0C) CCA_MODE = 0 (Always) / RXOFF_MODE = 0x11/ TXOFF_MODE = 0x11
+	cc2500_strobe(CC2500_SIDLE);
 	cc2500_write_reg(CC2500_MCSM1, MCSM1_TXOFF_MODE_RX | MCSM1_RXOFF_MODE_RX);
-	// 04 - (0x18 0x18) FS_AUTOCAL = 0x01 / PO_TIMEOUT = 0x10 ( Expire count 64 Approx. 149 – 155 µs)
 	cc2500_write_reg(CC2500_MCSM0, 1<<MCSM0_FS_AUTOCAL_pos | 2<<MCSM0_PO_TIMEOUT_pos);
-	// 05 - (0x06 0x19) PKTLEN=0x19
 	cc2500_write_reg(CC2500_PKTLEN, 25);
-	// 06 - (0x07 0x04) PQT = 0  / CRC_AUTOFLUSH = 0 / APPEND_STATUS = 1 / ADR_CHK = 0 (No address check)
-	// cc2500_write_reg(CC2500_PKTCTRL1, 0x04);
-	// 07 - (0x08 0x05) WHITE_DATA = 0 / PKT_FORMAT = 0 / CC2400_EN = 0 / CRC_EN = 1 / LENGTH_CONFIG = 1
+	cc2500_write_reg(CC2500_PKTCTRL1, PKTCTRL1_APPEND_STATUS | PKTCTRL1_CRC_AUTOFLUSH | 1<<PKTCTRL1_ADD_CHK_pos);
 	cc2500_write_reg(CC2500_PKTCTRL0, PKTCTRL0_LENGTH_CONFIG_VARIABLE | PKTCTRL0_CRC_EN);
-	// 08 - (0x3E 0xFF) PATABLE(0) = 0xFF (+1dBm)
+	// PATABLE(0) = 0xFF (+1dBm)
 	cc2500_write_reg(CC2500_PATABLE, 0xFF);
-	// 19 - (0x0B 0x08) FREQ_IF = 0x08 (IF = 203.125kHz)
+	//FREQ_IF = 0x08 (IF = 203.125kHz)
 	cc2500_write_reg(CC2500_FSCTRL1, 8<<FSCTRL1_FREQ_IF_pos);
-	// there is some offset
+	// there is some offset, determined ta binding time
 	cc2500_write_reg(CC2500_FSCTRL0, 0);
-	// 11 - (0x0D 0x5C)
+	//FREQ = 0x5C7627 (F = 2404MHz)
 	cc2500_write_reg(CC2500_FREQ2, 0x5C);
-	// 12 - (0x0E 0x76)
 	cc2500_write_reg(CC2500_FREQ1, 0x76);
-	// 13 - (0x0F 0x27) FREQ = 0x5C7627 (F = 2404MHz)
 	cc2500_write_reg(CC2500_FREQ0, 0x27);
-	// 14 - (0x10 0xAA) CHANBW_E = 0x10 / CHANBW_M = 0x10 / BW = 135.417kHz / DRATE_E = 0x0A
 	cc2500_write_reg(CC2500_MDMCFG4, 2<<MDMCFG4_CHANBW_E_pos | 2<<MDMCFG4_CHANBW_M_pos | 10<<MDMCFG4_DRATE_E_pos);
-	// cc2500_write_reg(CC2500_MDMCFG4, 0xEA);
-	// 15 - (0x11 0x39) DRATE_M = 0x39 Bitrate = 31044 bps
+	//Bitrate = 31044 bps
 	cc2500_write_reg(CC2500_MDMCFG3, 57<<MDMCFG3_DRATE_M_pos);
-	// 16 - (0x12 0x11) MOD_FORMAT = 0x01 (GFSK) / SYNC_MODE = 0x01 (15/16 sync word bits detected)
 	cc2500_write_reg(CC2500_MDMCFG2, MDMCFG2_MOD_FORMAT_GFSK | MDMCFG2_SYNC_MODE_15_16);
-	// 17 - (0x13 0x23) FEC_EN = Disable / NUM_PREAMBLE = 0x02 (4 bytes) / CHANSPC_E = 0x03
 	cc2500_write_reg(CC2500_MDMCFG1, MDMCFG1_NUM_PREAMBLE_4 | 3<<MDMCFG1_CHANSPC_E_pos);
-	// 18 - (0x14 0x7A) CHANSPC_M = 0x7A Channel Spacing = 299927Hz
+	// Channel Spacing = 299927Hz
 	cc2500_write_reg(CC2500_MDMCFG0, 122<<MDMCFG0_CHANSPC_M_pos);
-	// 19 - (0x15 0x42) DEVIATION_E = 0x100 / DEVIATION_M = 0x02 / Deviation = 31738Hz
+	// Deviation = 31738Hz
 	cc2500_write_reg(CC2500_DEVIATN, 4<<DEVIATN_DEVIATION_E_pos | 2<<DEVIATN_DEVIATION_M_pos);
-	// 20 - (0x19 0x16) FOC_BS_CS_GATE = 0 / FOC_PRE_K = 0x10 / FOC_POST_K = 1 / FOC_LIMIT = 0x10
-	// cc2500_write_reg(CC2500_FOCCFG, 0x16);
-	//test
-	cc2500_write_reg(CC2500_FOCCFG, 0);
-	// 21 - (0x1A 0x6C) BS_PRE_KI = 0x01 (2KI) / BS_PRE_KP = 0x10 (3KP) / BS_POST_KI = 1 (KI /2) / BS_POST_KP = 1 (Kp) / BS_LIMIT = 0
 	cc2500_write_reg(CC2500_BSCFG, 1<<BSCFG_BS_PRE_KI_pos | 2<<BSCFG_BS_PRE_KP_pos | 1<<BSCFG_BS_POST_KI_pos | 1<<BSCFG_BS_POST_KP_pos);
-	// 22 - (0x1B 0x03) MAX_DVGA_GAIN = 0 / MAX_LNA_GAIN = 0 / MAGN_TARGET = 0x03
 	cc2500_write_reg(CC2500_AGCTRL2, 3<<AGCCTRL2_MAGN_TARGET_pos);
-	// 23 - (0x1C 0x40) AGCCTRL1 = 0x40
 	cc2500_write_reg(CC2500_AGCTRL1, AGCCTRL1_AGC_LNA_PRIORITY);
+
+	//TODO: check following settings
+	cc2500_write_reg(CC2500_FOCCFG, 0x16);
 	// 24 - (0x1D 0x91) AGCCTRL0 = 0x91
 	cc2500_write_reg(CC2500_AGCTRL0, 0x91);
 	// 25 - (0x21 0x56) FREND1
 	cc2500_write_reg(CC2500_FREND1, 0x56);
 	// 26 - (0x22 0x10) FREND0: LODIV_BUF_CURRENT = 1
 	cc2500_write_reg(CC2500_FREND0, 0x10);
-	// 27 - (0x23 0xA9) FSCAL3 = 0xA9
-	cc2500_write_reg(CC2500_FSCAL3, 0xA9);
-	// 28 - (0x24 0x0A) FSCAL2 = 0x0A
-	cc2500_write_reg(CC2500_FSCAL2, 0x0A);
-	// 29 - (0x25 0x00) FSCAL1 = 0x00
-	cc2500_write_reg(CC2500_FSCAL1, 0x00);
-	// 30 - (0x26 0x11) FSCAL0 = 0x11
-	cc2500_write_reg(CC2500_FSCAL0, 0x11);
 	// 31 - (0x29 0x59) FSTEST = 0x59  (Same as specified in datasheet)
 	cc2500_write_reg(CC2500_FSTEST, 0x59);
 	// 32 - (0x2C 0x88) TEST2 = 0x88 (Same as specified in datasheet and by SmartRF sw)
@@ -779,27 +697,9 @@ void protocol_frsky_init(void)
 	cc2500_write_reg(CC2500_TEST1, 0x31);
 	// 34 - (0x2E 0x0B) TEST0 = 0x0B (Same as specified in datasheet and by SmartRF sw)
 	cc2500_write_reg(CC2500_TEST0, 0x0B);
-	// 35 - (0x03 0x07) FIFOTHR = 0x07
 	cc2500_write_reg(CC2500_FIFOTHR, 0x07);
-	// 36 - (0x09 0x00) ADDR = 0
-	// cc2500_write_reg(CC2500_ADDR, 168);
-	// 37 - (0x36) SIDLE
-	cc2500_strobe(CC2500_SIDLE);
-	// 38 - (0x02 0x06) IOCFG0
+
+	//set gpio pins as outputs, low
 	cc2500_write_reg(CC2500_IOCFG0, 0x2F);//HW low
-	//testing
 	cc2500_write_reg(CC2500_IOCFG2, 0x2F);//HW low
-	// 39 - (0x09 0x85) ADDR = 0x85
-	// cc2500_write_reg(CC2500_ADDR, 168);//TX 2w
-	// cc2500_write_reg(CC2500_ADDR, 3);//TX bind
-	// 40 - (0x0A 0x03) Channel = 0x03
-	// cc2500_write_reg(CC2500_CHANNR, 0);
-	//test
-	// cc2500_set_channel(3);
-	// 41 - (0x07 0x05) PKTCTRL1: ADR_CHK=1 / APPEND_STATUS=1
-	// cc2500_write_reg(CC2500_PKTCTRL1, 0x05);
-	//only append bytes, do not check address for testing
-	cc2500_write_reg(CC2500_PKTCTRL1, PKTCTRL1_APPEND_STATUS | PKTCTRL1_CRC_AUTOFLUSH | 1<<PKTCTRL1_ADD_CHK_pos);
-	// 42 - (0x34) Enable RX
-	cc2500_strobe(CC2500_SRX);
 }

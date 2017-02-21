@@ -21,7 +21,7 @@
 #include "misc.h"
 
 
-#define ADC_SEQ_SMPR	7
+#define ADC_SEQ_SMPR	1
 
 void adc_init_single(void)
 {

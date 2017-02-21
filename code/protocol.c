@@ -25,6 +25,7 @@
 #include "flash.h"
 #include "uart.h"
 #include "timers.h"
+#include "adc.h"
 
 uint8_t frsky_channel_data[FRSKY_CHANNEL_COUNT][4];//channel, FSCAL3, FSCAL2, FSCAL1
 
@@ -472,8 +473,8 @@ void protocol_frsky_packet_send(void)
 	packet[FRSKY_2W_TX_IDX_LENGTH]=FRSKY_2W_TX_LENGTH;
 	packet[FRSKY_2W_TX_IDX_TX_ADDR_H]=frsky_tx_id.nibble.high;
 	packet[FRSKY_2W_TX_IDX_TX_ADDR_L]=frsky_tx_id.nibble.low;
-	packet[FRSKY_2W_TX_IDX_A1]=127;
-	packet[FRSKY_2W_TX_IDX_A2]=200;
+	packet[FRSKY_2W_TX_IDX_A1]=adc_measure_single_blocking(4)>>4;//12bit ADC, but only 8bit data space :(
+	packet[FRSKY_2W_TX_IDX_A2]=adc_measure_single_blocking(5)>>4;
 	packet[FRSKY_2W_TX_IDX_RX_RSSI]=frsky_last_rssi/2;
 	cc2500_write_fifo(packet, FRSKY_2W_TX_LENGTH+1);
 	delay_us(1000);//delay when it works.. TODO: turn delay into timeout action

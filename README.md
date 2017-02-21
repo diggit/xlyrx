@@ -10,6 +10,7 @@ This project is another opensource receiver for cc2500 based radios.
 - bind time RX-TX frequency offset elimination
 - high power power amplifier and high sensitivity low noise amplifier cc2500 module
 - alternative power input for channels 5,6,7,8
+- 2 analog inputs
 
 *ready, but hardcoded for now*
 - configurable ppm frequency
@@ -17,7 +18,6 @@ This project is another opensource receiver for cc2500 based radios.
 	- ppm frequency is defined by 3rd timer, all channels have same frequency for now, to be able to have different ppm frequency for each group, packet timeout timer must be changed from regular timer to systick, then we'll have free HW timer to drive second group of outputs with different frequency
 
 *HW ready, SW not yet written*
-- adc inputs (2)
 - UART (3,3V) for loading new firmware (bootloader) and RX user configuration
 - UART (3,3V) for external telemetry configuration (raw or FrSky format)
 

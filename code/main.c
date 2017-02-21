@@ -26,6 +26,7 @@
 #include "timers.h"
 #include "flash.h"
 #include "hardware.h"
+#include "adc.h"
 
 #include <inttypes.h>
 
@@ -69,6 +70,8 @@ int main(void)
 	system_clock_init();
 	gpio_init();
 	swdt_init();
+	adc_init_single();
+	adc_calibrate();
 
 	irq_enable();
 	irq_NVIC_ISE(EXTI9_5_IRQn);

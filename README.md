@@ -6,7 +6,7 @@ This project is another opensource receiver for cc2500 based radios.
 ## Features
 - FrSky 2-way (telemetry) protocol for D-series
 - based on ARM MCU (STM32)
-- Hardware generated high resolution ppm signal** (~4 times higher, than FrSky can tranfer)
+- Hardware generated high resolution ppm signal (~4 times higher, than FrSky can tranfer)
 - bind time RX-TX frequency offset elimination
 - high power power amplifier and high sensitivity low noise amplifier cc2500 module
 - alternative power input for channels 5,6,7,8
@@ -25,8 +25,6 @@ This project is another opensource receiver for cc2500 based radios.
 - if TX and RX are too close during binding, binding may not be successful (stuck in binding mode)
 	- maybe some AGC tuning could help
 	- workaround would be binding procedure restart
-
-
 
 
 ## Why?

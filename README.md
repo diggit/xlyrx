@@ -11,6 +11,7 @@ This project is another opensource receiver for cc2500 based radios.
 - high power power amplifier and high sensitivity low noise amplifier cc2500 module
 - alternative power input for channels 5,6,7,8
 - 2 analog inputs
+- initial work on fail-safes, when signal is lost, outputs are tuned off now, user config is missing
 
 *ready, but hardcoded for now*
 - configurable ppm frequency
@@ -20,6 +21,7 @@ This project is another opensource receiver for cc2500 based radios.
 *HW ready, SW not yet written*
 - UART (3,3V) for loading new firmware (bootloader) and RX user configuration
 - UART (3,3V) for external telemetry configuration (raw or FrSky format)
+- meaningful usage of LED (we have 2 of them, so use them!)
 
 ### Known issues
 - if TX and RX are too close during binding, binding may not be successful (stuck in binding mode)

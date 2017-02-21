@@ -42,6 +42,8 @@ union frsky_id
 union frsky_id frsky_tx_id={.id=0};//set default ID to 0, means not yet set
 //in fact, this id is id of link between RX and TX, TX requires same ID in telemetry packets
 
+//TODO: implement failsafe, output off for now
+uint16_t frsky_failsafe[PPM_OUTPUTS]={0};
 
 //OFFSET CALIBRATION
 
@@ -465,6 +467,8 @@ volatile uint8_t frsky_last_rssi=0;
 
 void protocol_frsky_packet_send(void)
 {
+	swdt_restart(FRSKY_2W_TX_DELAY);//delay between RXED and TXING
+
 	cc2500_strobe(CC2500_SIDLE);
 	cc2500_strobe(CC2500_SFTX);//flush TX buffer, should not be necessary
 	cc2500_strobe(CC2500_SFRX);//flush RX buffer, should not be necessary
@@ -477,16 +481,21 @@ void protocol_frsky_packet_send(void)
 	packet[FRSKY_2W_TX_IDX_A2]=adc_measure_single_blocking(5)>>4;
 	packet[FRSKY_2W_TX_IDX_RX_RSSI]=frsky_last_rssi/2;
 	cc2500_write_fifo(packet, FRSKY_2W_TX_LENGTH+1);
-	delay_us(1000);//delay when it works.. TODO: turn delay into timeout action
-	cc2500_mode_tx();
 }
 
 volatile uint8_t packets_lost=0;
 volatile uint8_t lna_state=0;
 
+void protocol_frsky_packet_send_finished(void)//called on TX end to switch back to RX mode
+{
+	// cc2500_reset_callback(GDO2);
+	protocol_frsky_hop(1);//hop to next channel where next RX packet arrives
+	cc2500_mode_rx(lna_state);//switch to RX mode
+}
+
+
 void protocol_frsky_packet_rxed_callback(void)
 {
-
 	uint8_t bytes=cc2500_read_reg(CC2500_RXBYTES);
 
 	if(bytes!=FRSKY_2W_RX_TOTAL_LENGTH)
@@ -504,10 +513,9 @@ void protocol_frsky_packet_rxed_callback(void)
 	}
 
 
-	// uart_send_string_blocking(itoa(swdt_get(),4));
+
 	swdt_restart(FRSKY_PACKET_TIMEOUT);
 	protocol_frsky_hop(1);
-	// uart_send_string_blocking(" RX ");
 	packets_lost=0;
 
 
@@ -525,15 +533,14 @@ void protocol_frsky_packet_rxed_callback(void)
 	//YAY! packet was probably valid, continue processing...
 	switch (frsky_state)
 	{
-		//expected packed and we goot it
+		//expected packet and we goot it
 		case RX_PKT1:
 		case RX_PKT2:
 		case RX_PKT3:
 			frsky_state++;
 			break;
 
-		case TX_PKT:
-			//telemetry packet shoul have been sent, but we got packet incomming, weitd situation
+		case TX_PKT://telemetry packet should have been sent, but we got packet incomming, weird situation
 			frsky_state=RX_PKT1;
 			uart_send_string_blocking("RXed while TXing!\n");
 			break;
@@ -552,15 +559,13 @@ void protocol_frsky_packet_rxed_callback(void)
 
 	frsky_last_rssi=(int16_t)(int8_t)packet[FRSKY_PKT_INX_RSSI(FRSKY_2W_TX_LENGTH)]-INT8_MIN;//save RSSI value, we might need it in telemetry packet
 
-	//disable LNA if RSSI gets too high (RX saturation)
-	if(frsky_last_rssi > FRSKY_RSSI_MAX && lna_state!=0 )
+	if(frsky_last_rssi > FRSKY_RSSI_MAX && lna_state!=0 )//disable LNA if RSSI gets too high (RX saturation)
 	{
 		lna_state=0;
 		uart_send_string_blocking("LNA OFF\n");
 	}
 
-	//enable LNA when RSSI is low enough
-	else if(frsky_last_rssi < FRSKY_RSSI_MIN && lna_state==0 )
+	else if(frsky_last_rssi < FRSKY_RSSI_MIN && lna_state==0 )//enable LNA when RSSI is low enough
 	{
 		uart_send_string_blocking("LNA ON\n");
 		lna_state=1;
@@ -571,7 +576,7 @@ void protocol_frsky_packet_rxed_callback(void)
 	protocol_frsky_extract(packet, channels);
 	ppm_set_ticks(FRSKY_1ms, FRSKY_2ms, channels);
 
-	if(frsky_state==TX_PKT)
+	if(frsky_state==TX_PKT)//what we will expect as next event
 	{
 		protocol_frsky_packet_send();//sends telemetry packet after 3rx packet was received
 	}
@@ -586,7 +591,11 @@ void protocol_frsky_packet_timeout_callback(void)
 {
 	if(packets_lost>=FRSKY_PACKETS_LOST_RESYNC_THRESHOLD || frsky_state==NOSYNC)
 	{
-		frsky_state=NOSYNC;
+		if(frsky_state!=NOSYNC)
+		{
+			frsky_state=NOSYNC;
+			ppm_set_ticks(FRSKY_1ms, FRSKY_2ms, frsky_failsafe);
+		}
 		protocol_frsky_hop(1);
 		cc2500_mode_rx(1);//when we lost signal, turn on LNA
 		uart_send_string_blocking("NOSYNC CH: ");
@@ -596,25 +605,31 @@ void protocol_frsky_packet_timeout_callback(void)
 	}
 	else
 	{
-		protocol_frsky_hop(1);
-		swdt_restart(FRSKY_PACKET_TIMEOUT);
 		switch(frsky_state)
 		{
 			//expected packet from TX, but nothing arrived in time
 			case RX_PKT1:
 			case RX_PKT2:
 			case RX_PKT3:
+				swdt_restart(FRSKY_PACKET_TIMEOUT);//schedule tomeout for next packet
+				protocol_frsky_hop(1);//hop to nect channel to get ready for next packet
+				cc2500_mode_rx(lna_state);//back to rx
 				packets_lost++;
+				uart_send_string_blocking("TO ");
+				uart_send_string_blocking(itoa(frsky_state,1));
+				uart_send_string_blocking("\n");
 				break;
 
-			case TX_PKT:
+			case TX_PKT://time to send telemetry packet
+				cc2500_mode_tx();//send prepaired packet
+				swdt_restart(2*FRSKY_PACKET_TIMEOUT-FRSKY_2W_TX_DELAY);//schedule next TO for next pkt, subtract time we waited before TXing
+				cc2500_set_callback(GDO2, RISING, protocol_frsky_packet_send_finished, NONE);
 				frsky_state=RX_PKT1;
 				break;
 
 			case NOSYNC:
 				break;
 		}
-		cc2500_mode_rx(lna_state);
 	}
 }
 
@@ -639,7 +654,8 @@ void protocol_frsky_start(uint8_t force_bind)
 	cc2500_write_reg(CC2500_ADDR, frsky_tx_id.nibble.high);//hw can check only 1 byte of 2 byte ID, second part is checked by SW (just for sure)
 	cc2500_set_callback(GDO0, RISING,	protocol_frsky_packet_rxed_callback, NOT_EMPTY);//set intterupt on falling edge of GDO0
 	cc2500_write_reg(CC2500_FOCCFG, 0x16);//enable frequecy autotune
-	cc2500_write_reg(CC2500_IOCFG0, 0x01);
+	cc2500_write_reg(CC2500_IOCFG0, 0x01);//goes high when packet is received (or RX fifo above threshold)
+	cc2500_write_reg(CC2500_IOCFG2, 0x1B);//Powerdown signal for PA, that means packet was TXED
 	cc2500_write_reg(CC2500_FIFOTHR, 7);//5 ~ 24+ bytes in RXFIFO to trigger -> troggered on pkt end only
 	protocol_frsky_hop(0);//load channel config
 	cc2500_mode_rx(1);//LNA state should not matter, will be tuned dynamically

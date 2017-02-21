@@ -61,6 +61,8 @@
 
 	#define PPM_CH_A_TIME_TO_TICKS(T) (PPM_TIMER_MAX-T*(PPM_CH_A_F_IN/(PPM_CH_A_PRESCALER*T_us)))
 
+	#define PPM_OUTPUTS		8
+
 	void ppm_init(void);
 	void ppm_set_ticks(uint16_t ref1000, uint16_t ref2000, uint16_t *channels);
 

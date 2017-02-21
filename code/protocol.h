@@ -79,6 +79,10 @@
 	#define FRSKY_2W_TX_IDX_A2			 4
 	#define FRSKY_2W_TX_IDX_RX_RSSI		 5
 	//rest of the packet are telemetry data
+
+	//delay between Rxed packet a Txing start of telemetry packet
+	#define FRSKY_2W_TX_DELAY			(1*SWDT_1ms) //ms
+
 	//TODO: implement external (UART) telemetry https://www.rcgroups.com/forums/showthread.php?2547257-FrSky-telemetry-hub-protocol-(on-air)
 
 	//to easily get higher and lower nibble from byte

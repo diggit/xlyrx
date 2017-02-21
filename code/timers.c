@@ -150,6 +150,10 @@ void ppm_set_ticks(uint16_t ref1000, uint16_t ref2000, uint16_t *channels)
 			// 		uart_send_byte_blocking('\n');
 			// 	}
 		}
+		else
+		{
+			*target = 0;//turn off output
+		}
 	}
 	//CH1
 	// PPM_A_TMR->CCR1=crop_i16(linear_aproximation(channels[0], ref1000, PPM_CH_A_TIME_TO_TICKS(1000), ref2000, PPM_CH_A_TIME_TO_TICKS(2000)), PPM_CLAMP_MIN, PPM_CLAMP_MAX);

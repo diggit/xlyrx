@@ -185,6 +185,20 @@ typedef enum
    __O  uint32_t STIR;                   /*!< Offset: 0xE00 ( /W)  Software Trigger Interrupt Register */
  }  NVIC_Type;
 
+
+
+
+ /**
+   \brief  Structure type to access the System Timer (SysTick).
+  */
+ typedef struct
+ {
+   __IO uint32_t CTRL;                   /*!< Offset: 0x000 (R/W)  SysTick Control and Status Register */
+   __IO uint32_t LOAD;                   /*!< Offset: 0x004 (R/W)  SysTick Reload Value Register */
+   __IO uint32_t VAL;                    /*!< Offset: 0x008 (R/W)  SysTick Current Value Register */
+   __I  uint32_t CALIB;                  /*!< Offset: 0x00C (R/ )  SysTick Calibration Register */
+ } SysTick_Type;
+
 /** @addtogroup Peripheral_registers_structures
   * @{
   */
@@ -704,8 +718,9 @@ typedef struct
 #define PERIPH_BB_BASE        ((uint32_t)0x42000000) /*!< Peripheral base address in the bit-band region */
 
 /* Memory mapping of Cortex-M3 Hardware */
-#define SCS_BASE              ((uint32_t)0xE000E000)                            /*!< System Control Space Base Address */
-#define NVIC_BASE             (SCS_BASE +  0x0100)                    /*!< NVIC Base Address */
+#define SCS_BASE              ((uint32_t)0xE000E000) /*!< System Control Space Base Address */
+#define NVIC_BASE             (SCS_BASE +  0x0100)   /*!< NVIC Base Address */
+#define SysTick_BASE          (SCS_BASE +  0x0010UL) /*!< SysTick Base Address */
 
 /*!< Peripheral memory map */
 #define APB1PERIPH_BASE       PERIPH_BASE
@@ -774,6 +789,7 @@ typedef struct
   * @{
   */
 #define NVIC                ((NVIC_Type   *) NVIC_BASE)
+#define STK                 ((SysTick_Type*) SysTick_BASE  )   /*!< SysTick configuration struct */
 #define TIM2                ((TIM_TypeDef *) TIM2_BASE)
 #define TIM3                ((TIM_TypeDef *) TIM3_BASE)
 #define TIM4                ((TIM_TypeDef *) TIM4_BASE)
@@ -2665,28 +2681,44 @@ typedef struct
 /*                                                                            */
 /******************************************************************************/
 
-/*****************  Bit definition for SysTick_CTRL register  *****************/
-#define SysTick_CTRL_ENABLE                 ((uint32_t)0x00000001)             /*!< Counter enable */
-#define SysTick_CTRL_TICKINT                ((uint32_t)0x00000002)             /*!< Counting down to 0 pends the SysTick handler */
-#define SysTick_CTRL_CLKSOURCE              ((uint32_t)0x00000004)             /*!< Clock source */
-#define SysTick_CTRL_COUNTFLAG              ((uint32_t)0x00010000)             /*!< Count Flag */
+/* SysTick Control / Status Register Definitions */
+#define STK_CTRL_COUNTFLAG_Pos          16U                                            /*!< SysTick CTRL: COUNTFLAG Position */
+#define STK_CTRL_COUNTFLAG_Msk          (1UL << STK_CTRL_COUNTFLAG_Pos)            /*!< SysTick CTRL: COUNTFLAG Mask */
+#define STK_CTRL_COUNTFLAG              STK_CTRL_COUNTFLAG_Msk
 
-/*****************  Bit definition for SysTick_LOAD register  *****************/
-#define SysTick_LOAD_RELOAD                 ((uint32_t)0x00FFFFFF)             /*!< Value to load into the SysTick Current Value Register when the counter reaches 0 */
+#define STK_CTRL_CLKSOURCE_Pos          2U                                            /*!< SysTick CTRL: CLKSOURCE Position */
+#define STK_CTRL_CLKSOURCE_Msk          (1UL << STK_CTRL_CLKSOURCE_Pos)            /*!< SysTick CTRL: CLKSOURCE Mask */
+#define STK_CTRL_CLKSOURCE              STK_CTRL_CLKSOURCE_Msk
 
-/*****************  Bit definition for SysTick_VAL register  ******************/
-#define SysTick_VAL_CURRENT                 ((uint32_t)0x00FFFFFF)             /*!< Current value at the time the register is accessed */
+#define STK_CTRL_TICKINT_Pos            1U                                            /*!< SysTick CTRL: TICKINT Position */
+#define STK_CTRL_TICKINT_Msk            (1UL << STK_CTRL_TICKINT_Pos)              /*!< SysTick CTRL: TICKINT Mask */
+#define STK_CTRL_TICKINT                STK_CTRL_TICKINT_Msk
 
-/*****************  Bit definition for SysTick_CALIB register  ****************/
-#define SysTick_CALIB_TENMS                 ((uint32_t)0x00FFFFFF)             /*!< Reload value to use for 10ms timing */
-#define SysTick_CALIB_SKEW                  ((uint32_t)0x40000000)             /*!< Calibration value is not exactly 10 ms */
-#define SysTick_CALIB_NOREF                 ((uint32_t)0x80000000)             /*!< The reference clock is not provided */
+#define STK_CTRL_ENABLE_Pos             0U                                    /*!< SysTick CTRL: ENABLE Position */
+#define STK_CTRL_ENABLE_Msk             (1UL << STK_CTRL_ENABLE_Pos)           /*!< SysTick CTRL: ENABLE Mask */
+#define STK_CTRL_ENABLE                 STK_CTRL_ENABLE_Msk                    /*!< Counter enable */
 
-/******************************************************************************/
-/*                                                                            */
-/*                  Nested Vectored Interrupt Controller                      */
-/*                                                                            */
-/******************************************************************************/
+/* SysTick Reload Register Definitions */
+#define STK_LOAD_RELOAD_Pos             0U                                            /*!< SysTick LOAD: RELOAD Position */
+#define STK_LOAD_RELOAD_Msk             (0xFFFFFFUL /*<< STK_LOAD_RELOAD_Pos*/)    /*!< SysTick LOAD: RELOAD Mask */
+
+/* SysTick Current Register Definitions */
+#define STK_VAL_CURRENT_Pos             0U                                            /*!< SysTick VAL: CURRENT Position */
+#define STK_VAL_CURRENT_Msk             (0xFFFFFFUL /*<< STK_VAL_CURRENT_Pos*/)    /*!< SysTick VAL: CURRENT Mask */
+
+/* SysTick Calibration Register Definitions */
+#define STK_CALIB_NOREF_Pos             31U                                            /*!< SysTick CALIB: NOREF Position */
+#define STK_CALIB_NOREF_Msk             (1UL << STK_CALIB_NOREF_Pos)               /*!< SysTick CALIB: NOREF Mask */
+#define STK_CALIB_NOREF                 STK_CALIB_NOREF_Msk
+
+#define STK_CALIB_SKEW_Pos              30U                                            /*!< SysTick CALIB: SKEW Position */
+#define STK_CALIB_SKEW_Msk              (1UL << STK_CALIB_SKEW_Pos)                /*!< SysTick CALIB: SKEW Mask */
+#define STK_CALIB_SKEW                  STK_CALIB_SKEW_Msk
+
+#define STK_CALIB_TENMS_Pos             0U                                            /*!< SysTick CALIB: TENMS Position */
+#define STK_CALIB_TENMS_Msk             (0xFFFFFFUL /*<< SysTick_CALIB_TENMS_Pos*/)    /*!< SysTick CALIB: TENMS Mask */
+
+/*@} end of group CMSIS_SysTick */
 
 /******************  Bit definition for NVIC_ISER register  *******************/
 #define NVIC_ISER_SETENA_Pos                (0U)

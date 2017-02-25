@@ -679,7 +679,7 @@ void protocol_frsky_init(void)
 	cc2500_write_reg(CC2500_PATABLE, 0xFF);
 	//FREQ_IF = 0x08 (IF = 203.125kHz)
 	cc2500_write_reg(CC2500_FSCTRL1, 8<<FSCTRL1_FREQ_IF_pos);
-	// there is some offset, determined ta binding time
+	// there is some offset, determined ta binding time, but set it to 0 as default
 	cc2500_write_reg(CC2500_FSCTRL0, 0);
 	//FREQ = 0x5C7627 (F = 2404MHz)
 	cc2500_write_reg(CC2500_FREQ2, 0x5C);

@@ -27,28 +27,31 @@
 	#define MEM_MAGIC	0x71BA	//value in flash storage page to indicate valid data
 	#define MEM_VERSION	1	//when flash storage format changes, increase this value to prevent loading corrupted data
 
-	#define T_us	1000000U
-	#define T_ms	1000
+	#define T_us		1000000U
+	#define T_ms		1000
 
-	#define F_CPU	72000000U
-	#define F_APB1	(F_CPU/2)
-	#define F_APB2	(F_CPU)
+	#define F_CPU		72000000U
+	#define F_APB1		(F_CPU/2)
+	#define F_APB2		(F_CPU)
+
+	#define SYSTICK_F	100 //how often should system process buttons, LEDs,...
 
 	#define UART_BAUD	115200
 
 	#define CC2500_SPI_SLAVE_ID		0
 
-	#define SWDT_RESOLUTION	100//time units
-	#define SWDT_F_IN		(F_CPU)
+	#define SWDT_RESOLUTION			100//time units
+	#define SWDT_F_IN				(F_CPU)
 
-	#define PPM_TRIG_F_IN		(F_APB1*2) //7.2 last note, LOL
-	#define PPM_TRIG_F_OUT		50//Hz
+	#define PPM_TRIG_F_IN			(F_APB1*2) //7.2 last note, LOL
+	#define PPM_TRIG_F_OUT			50//Hz
 	#define PPM_TRIG_RESOLUTION_us	10//
 
-	#define PPM_CH_A_F_IN		(F_APB1*2) //7.2 last note, LOL
-	#define PPM_CH_B_F_IN		(F_APB1*2) //7.2 last note, LOL
+	#define PPM_CH_A_F_IN			(F_APB1*2) //7.2 last note, LOL
+	#define PPM_CH_B_F_IN			(F_APB1*2) //7.2 last note, LOL
 
-	#define PPM_PULSE_ABS_MAX_us		3000//3ms is acheaveable at least
+	#define PPM_PULSE_ABS_MAX_us	3000//3ms is acheaveable at least
+
 
 	//SPI
 	struct SPI_SLAVE

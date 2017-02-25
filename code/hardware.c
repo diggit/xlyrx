@@ -131,19 +131,3 @@ void gpio_init(void)
 	//enable EXTI inttterupt for GDOs
 	AFIO->EXTICR[2]=AFIO_EXTICR3_EXTI8_PB | AFIO_EXTICR3_EXTI9_PB;
 }
-
-void led1_flash(uint8_t data)
-{
-	led1_on();
-	delay_ms(data);
-	led1_off();
-	delay_ms(data);
-}
-
-void led2_flash(uint8_t data)
-{
-	led2_on();
-	delay_ms(data);
-	led2_off();
-	delay_ms(data);
-}

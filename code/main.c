@@ -27,6 +27,7 @@
 #include "flash.h"
 #include "hardware.h"
 #include "adc.h"
+#include "systick.h"
 
 #include <inttypes.h>
 
@@ -73,6 +74,11 @@ int main(void)
 	adc_init_single();
 	adc_calibrate();
 
+	systick_init();
+
+	// systick_blink_set(HARDWARE_LED_2, 0, SYSTICK_1s*0.1);
+
+
 	irq_enable();
 	irq_NVIC_ISE(EXTI9_5_IRQn);
 
@@ -94,7 +100,7 @@ int main(void)
 	protocol_frsky_start(0);
 
 
-	led1_flash(100);
+	// led1_flash(100);
 
 	while(1)
 	{

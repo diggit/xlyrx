@@ -25,27 +25,36 @@
 
 	void gpio_init(void);
 
-	inline void led1_on(void)
+	#define HARDWARE_LED_1		0
+	#define HARDWARE_LED_2		1
+	#define HARDWARE_LED_COUNT	2
+
+	inline void led_on(uint8_t led)
 	{
-		GPIOC->BSRR=GPIO_BSRR_BR13;
+		switch(led)
+		{
+			case HARDWARE_LED_1:
+				GPIOC->BSRR=GPIO_BSRR_BR13;
+				return;
+
+			case HARDWARE_LED_2:
+				GPIOC->BSRR=GPIO_BSRR_BR14;
+				return;
+		}
 	}
 
-	inline void led1_off(void)
+	inline void led_off(uint8_t led)
 	{
-		GPIOC->BSRR=GPIO_BSRR_BS13;
-	}
+		switch(led)
+		{
+			case HARDWARE_LED_1:
+				GPIOC->BSRR=GPIO_BSRR_BS13;
+				return;
 
-	inline void led2_on(void)
-	{
-		GPIOC->BSRR=GPIO_BSRR_BR14;
+			case HARDWARE_LED_2:
+				GPIOC->BSRR=GPIO_BSRR_BS14;
+				return;
+		}
 	}
-
-	inline void led2_off(void)
-	{
-		GPIOC->BSRR=GPIO_BSRR_BS14;
-	}
-
-	void led1_flash(uint8_t data);
-	void led2_flash(uint8_t data);
 
 #endif

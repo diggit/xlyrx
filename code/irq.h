@@ -63,6 +63,6 @@
 			irq_enable();\
 		}while(0)
 
-	void irq_NVIC_ISE(uint8_t interrupt);
+	void irq_NVIC_ISE(int8_t interrupt);
 
 #endif

@@ -20,7 +20,9 @@
 #include "misc.h"
 #include "stm32f103xb.h"
 
-void irq_NVIC_ISE(uint8_t interrupt)
+void irq_NVIC_ISE(int8_t interrupt)
 {
+	if(interrupt<0)//negative are exceptions, ignored
+		return;
 	NVIC->ISER[interrupt/32]=BIT(interrupt%32);
 }

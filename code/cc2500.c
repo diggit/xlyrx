@@ -128,16 +128,16 @@ void cc2500_ex_lna(uint8_t state)
 
 void cc2500_mode_tx(void)
 {
-	cc2500_strobe(CC2500_SIDLE);
 	cc2500_ex_lna(0);
+	cc2500_strobe(CC2500_SIDLE);
 	cc2500_ex_pa(1);
 	cc2500_strobe(CC2500_STX);
 }
 
 void cc2500_mode_rx(uint8_t LNA)
 {
-	cc2500_strobe(CC2500_SIDLE);
 	cc2500_ex_pa(0);
+	cc2500_strobe(CC2500_SIDLE);
 	cc2500_ex_lna(LNA);
 	cc2500_strobe(CC2500_SRX);
 	// delay_us(90);//time to turn on rx

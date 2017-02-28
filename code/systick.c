@@ -19,6 +19,7 @@
 #include "systick.h"
 #include "irq.h"
 #include "hardware.h"
+#include "uart.h"
 #include "stm32f103xb.h"
 
 struct led_blink_type

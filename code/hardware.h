@@ -57,4 +57,12 @@
 		}
 	}
 
+	inline uint8_t button_read(void)
+	{
+		if(bit_get(GPIOC->IDR, GPIO_IDR_IDR15))
+			return 1;
+		else
+			return 0;
+	}
+
 #endif

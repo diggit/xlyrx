@@ -119,13 +119,15 @@ void gpio_init(void)
 					//PC14	LED_2	(GPIO)
 					GPIO_OUTPUT				<<GPIO_CRH_MODE14_Pos|\
 					//PC15	BTN		(GPIO)
-					GPIO_INPUT				<<GPIO_CRH_MODE15_Pos;
+					GPIO_INPUT_PULL_UP_DOWN	<<GPIO_CRH_MODE15_Pos;
 
 	GPIOC->ODR =	\
 					//PC13	LED(OFF)
 					GPIO_ODR_ODR13|\
 					//PC14	LED(OFF)
-					GPIO_ODR_ODR14;
+					GPIO_ODR_ODR14|\
+					//PC15	BTN PUP
+					GPIO_ODR_ODR15;
 
 
 	//enable EXTI inttterupt for GDOs

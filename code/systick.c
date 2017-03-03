@@ -31,9 +31,16 @@ struct led_blink_type
 	volatile uint8_t state;//remember on/off state
 };
 struct led_blink_type leds[HARDWARE_LED_COUNT];
+uint8_t btn_timer;
+
+void (*volatile button_pressed_callback)(void)=NULL;
+void (*volatile button_held_callback)(void)=NULL;
+void (*volatile button_released_callback)(void)=NULL;
+
 
 void systick_init(void)
 {
+	btn_timer=0;
 	for(uint8_t l=0; l<HARDWARE_LED_COUNT; l++)
 		leds[l].period=0;//diable all leds blinking
 
@@ -64,11 +71,44 @@ int8_t systick_blink_stop(uint8_t led)
 		return -1;
 
 	leds[led].period=0;
+	led_off(led);
 	return 0;
 }
 
 void SysTick_Handler (void)
 {
+
+	//button handling
+	if(button_read())
+	{
+		if(btn_timer==0)
+		{
+			button_state=PRESSED;
+			if(button_pressed_callback!=NULL)
+				button_pressed_callback();
+		}
+
+
+		if(btn_timer<HARDWARE_BUTTON_HOLD_THRESHOLD)
+			btn_timer++;
+
+		else if(btn_timer==HARDWARE_BUTTON_HOLD_THRESHOLD)
+		{
+			button_state=HELD;
+			btn_timer++;
+			if(button_held_callback!=NULL)
+				button_held_callback();
+		}
+	}
+	else
+	{
+		button_state=RELEASED;
+		if(btn_timer!=0 && button_released_callback!=NULL)
+			button_released_callback();
+		btn_timer=0;
+	}
+
+	//blinking
 	for(uint8_t l=0; l<HARDWARE_LED_COUNT; l++)
 	{
 		if(leds[l].period>0)

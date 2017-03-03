@@ -10,4 +10,18 @@
 	int8_t systick_blink_set(uint8_t led, uint8_t blinks, uint16_t period);
 	int8_t systick_blink_stop(uint8_t led);
 
+	#define HARDWARE_BUTTON_HOLD_THRESHOLD	100	//how many ticks of systick timer must be button preseed to change to HOLD state
+
+	enum btn
+	{
+		RELEASED,
+		PRESSED,
+		HELD
+	}button_state;
+
+	void (*volatile button_pressed_callback)(void);
+	void (*volatile button_held_callback)(void);
+	void (*volatile button_released_callback)(void);
+
+
 #endif

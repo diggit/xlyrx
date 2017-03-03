@@ -68,21 +68,21 @@ size: $(TARGET)
 .PHONY: burn
 burn: $(TARGET).hex
 	@echo "---------------------BURN-------------------------"
-	openocd -f stm32f1xx_ftdi_swd.cfg -c "init; reset halt; flash write_image erase $<; reset run; exit"
+	openocd -f stm32f1xx_ftdi_swd.cfg -c "init; reset halt; flash write_image erase $<; reset run; ftdi_set_signal nSRST z; exit"
 
 .PHONY: reset
 reset: $(TARGET).hex
-	openocd -f stm32f1xx_ftdi_swd.cfg -c "init; reset run; exit"
+	openocd -f stm32f1xx_ftdi_swd.cfg -c "init; reset run; ftdi_set_signal nSRST z; exit"
 
 .PHONY: debug
 debug: $(TARGET).hex
 	openocd -f stm32f1xx_ftdi_swd.cfg -c "init; reset halt; flash write_image erase $<"&
 	arm-none-eabi-gdb main.elf -ex "target extended-remote localhost:3333" -ex "monitor reset halt"
-	echo "shutdown" | nc localhost 4444
+	echo "ftdi_set_signal nSRST z; exit" | nc localhost 4444
 
 
 .PHONY: peek
 peek: $(TARGET).hex
 	openocd -f stm32f1xx_ftdi_swd.cfg -c "init"&
 	arm-none-eabi-gdb main.elf -ex "target extended-remote localhost:3333"
-	echo "shutdown" | nc localhost 4444
+	echo "ftdi_set_signal nSRST z; exit" | nc localhost 4444

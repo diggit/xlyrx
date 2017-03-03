@@ -34,6 +34,7 @@
 
 void system_clock_init(void)
 {
+	bit_set(RCC->CSR, RCC_CSR_LSION);//enable LSI for IWDG
 	bit_set(FLASH->ACR, 1<<FLASH_ACR_LATENCY_Pos);//increase wait times for flash
 	// led_flash(0);
 	bit_clr(RCC->CR, RCC_CR_HSEON | RCC_CR_HSEBYP);//off ext OSC, off ext OSC bypass
@@ -62,6 +63,29 @@ void draw_bar(uint8_t length, uint8_t filled, uint8_t ch)
 	uart_send_byte_blocking(']');
 }
 
+void uart_handler(uint8_t data)
+{
+	if(data=='B')
+	{
+		led_on(HARDWARE_LED_2);
+		irq_disable();
+		GPIOA->BSRR=GPIO_BSRR_BS12;//charge capacitor on BL pin
+		delay_ms(10);
+
+		//reset using IDWG, I was not successful using system reset
+		IWDG->KR=0xCCCCU;//start IWDG
+		IWDG->KR=0x5555U;//enable access to prescaler and preload regs.
+		IWDG->RLR=1;
+		IWDG->PR=0;
+		while(IWDG->SR!=0)
+			NOP;
+		IWDG->KR=0xAAAAU;//reload IWDG
+
+		while(1)
+			NOP;
+	}
+
+}
 
 
 uint8_t fifo[64];
@@ -82,7 +106,10 @@ int main(void)
 	irq_enable();
 	irq_NVIC_ISE(EXTI9_5_IRQn);
 
+	led_on(HARDWARE_LED_2);
+
 	uart_init(NULL);
+	uart_rx_handler_set(uart_handler);
 	// uart_send_string_blocking("\x1B[1J\x1B[;H");
 	uart_send_string_blocking("\nxlyRX starting...\n");
 	uart_send_string_blocking("Build: ");
@@ -97,7 +124,7 @@ int main(void)
 
 	spi_init(3);
 	ppm_init();
-	protocol_frsky_start(0);
+	protocol_frsky_start(button_read());
 
 
 	// led1_flash(100);

@@ -19,6 +19,7 @@
 #include "stm32f103xb.h"
 #include "uart.h"
 #include "misc.h"
+#include "irq.h"
 
 void (*uart_rx_handler)(uint8_t rxed)=NULL;
 
@@ -28,12 +29,13 @@ void uart_init(void (*rx_handler)(uint8_t rxed))
 	// USART1->BRR= 39<<USART_BRR_DIV_Mantissa_Pos | 1<<USART_BRR_DIV_Fraction_Pos;//115200 @ 72MHz (39.0625)
 	USART1->BRR= 19<<USART_BRR_DIV_Mantissa_Pos | 8<<USART_BRR_DIV_Fraction_Pos;//230400 @ 72MHz
 	USART1->CR1= USART_CR1_UE | USART_CR1_TE | USART_CR1_RE | USART_CR1_RXNEIE;
-	uart_rx_handler = rx_handler;
+	uart_rx_handler_set(rx_handler);
 }
 
 void uart_rx_handler_set(void (*rx_handler)(uint8_t rxed))
 {
 	uart_rx_handler=rx_handler;
+	irq_NVIC_ISE(USART1_IRQn);
 }
 
 void uart_send_byte_array_blocking(const uint8_t *data)
@@ -51,19 +53,19 @@ void uart_send_byte_blocking(uint8_t data)
 		NOP;
 }
 
-//IRQ handler
-// void USART1_IRQHandler (void)
-// {
-// 	uint16_t SR=USART1->SR;
-// 	uint8_t DR=USART1->DR;
-// 	if(SR&USART_SR_RXNE)
-// 	{
-// 		if(uart_rx_handler!=NULL)
-// 			uart_rx_handler(DR);
-// 		// uart_send_byte_blocking(DR);
-//
-// 	}
-// }
+// IRQ handler
+void USART1_IRQHandler (void)
+{
+	uint16_t SR=USART1->SR;
+	uint8_t DR=USART1->DR;
+	if(SR&USART_SR_RXNE)
+	{
+		if(uart_rx_handler!=NULL)
+			uart_rx_handler(DR);
+		// uart_send_byte_blocking(DR);
+
+	}
+}
 
 
 

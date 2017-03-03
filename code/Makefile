@@ -24,6 +24,7 @@ SIZE			= $(TOOLCHAIN)-size
 OPTIMIZE		= 2
 LSCRIPT			= stm32f103.ld
 JOBS			= 9
+BLdev			= /dev/ttyUSB0
 
 SIZE_HISTORY	= size.log
 BUILD_NUM		= $(shell wc -l $(SIZE_HISTORY)|cut -d " " -f1)
@@ -71,7 +72,7 @@ burn: $(TARGET).hex
 	openocd -f stm32f1xx_ftdi_swd.cfg -c "init; reset halt; flash write_image erase $<; reset run; ftdi_set_signal nSRST z; exit"
 
 .PHONY: reset
-reset: $(TARGET).hex
+reset:
 	openocd -f stm32f1xx_ftdi_swd.cfg -c "init; reset run; ftdi_set_signal nSRST z; exit"
 
 .PHONY: debug
@@ -86,3 +87,17 @@ peek: $(TARGET).hex
 	openocd -f stm32f1xx_ftdi_swd.cfg -c "init"&
 	arm-none-eabi-gdb main.elf -ex "target extended-remote localhost:3333"
 	echo "ftdi_set_signal nSRST z; exit" | nc localhost 4444
+
+.PHONY: BLburn
+BLburn: $(TARGET).hex softreset
+	@echo "------------------BURN-using-BL-------------------"
+	@stm32flash -m 8e1 -b 57600 $(BLdev) > /dev/null | true #this is workaround, sometimes device init fails but second attempt was successful all the time during testing, increasing delay after soft reset does not help
+	@echo "FLASHING..."
+	stm32flash -m 8e1 -b 57600 -e 0 -w $< -R $(BLdev)
+
+.PHONY: softreset
+softreset:
+	@echo "Resetting..."
+	@stty -F $(BLdev) 230400
+	@echo -n "B" > $(BLdev)
+	@sleep 0.2

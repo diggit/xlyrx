@@ -26,6 +26,8 @@
 #include "uart.h"
 #include "timers.h"
 #include "adc.h"
+#include "hardware.h"
+#include "systick.h"
 
 uint8_t frsky_channel_data[FRSKY_CHANNEL_COUNT][4];//channel, FSCAL3, FSCAL2, FSCAL1
 
@@ -67,6 +69,7 @@ void protocol_frsky_calibrate_offset_next(void)
 		offset_cal_table_idx=INT8_MIN;
 		offset_cal_status=FRSKY_OFFSET_CAL_MEASURING;
 		uart_send_string_blocking("TX found, searching frequency offset...\n");
+		systick_blink_set(HARDWARE_LED_1, 0, SYSTICK_1s*0.2);
 	}
 	else
 	{
@@ -157,6 +160,7 @@ void protocol_frsky_calibrate_offset_start(void)
 	swdt_set_callback(protocol_frsky_calibrate_offset_timeout_callback);
 	swdt_restart(30*SWDT_1ms);
 
+	systick_blink_set(HARDWARE_LED_1, 0, SYSTICK_1s*0.5);
 	while(offset_cal_status!=FRSKY_OFFSET_CAL_FINISHED)
 		NOP;
 
@@ -300,7 +304,7 @@ void protocol_frsky_bind_finished(void)
 	uart_send_string_blocking("HOP sequence:\n");
 	for (uint8_t i = 0; i < FRSKY_CHANNEL_COUNT; i++)
 	{
-		uart_send_string_blocking(itoa(frsky_channel_data[i][0],3));
+		uart_send_string_blocking(itoa(frsky_channel_data[i][0],4));
 	}
 	frsky_hop_channels=FRSKY_HOP_TABLE_VALID;
 }
@@ -326,6 +330,7 @@ void protocol_frsky_bind_process_packet(void)
 		frsky_hop_channels=0;
 		uart_send_string_blocking("ID LEARNED\n");
 	}
+	systick_blink_set(HARDWARE_LED_1, 1, SYSTICK_1s*0.1);
 
 	if(frsky_tx_id.id==IDbuff.id)
 	{
@@ -361,8 +366,13 @@ void protocol_frsky_bind(void)
 	cc2500_set_callback(GDO0, RISING, protocol_frsky_bind_process_packet, NOT_EMPTY);//set callback on GDO0
 	cc2500_strobe(CC2500_SRX);
 
+	led_on(HARDWARE_LED_2);
+	systick_blink_stop(HARDWARE_LED_1);
+
 	while(frsky_hop_channels!=FRSKY_HOP_TABLE_VALID)
 		NOP;
+	systick_blink_stop(HARDWARE_LED_1);
+	systick_blink_stop(HARDWARE_LED_2);
 	uart_send_string_blocking("BINDING finished!\n");
 }
 
@@ -379,7 +389,7 @@ void protocol_frsky_calibrate_channels(void)
 		cc2500_write_reg(CC2500_CHANNR, frsky_channel_data[ch_index][0]);
 		cc2500_strobe(CC2500_SCAL);
 		delay_ms(2);	//PLL should be settled, TODO: check for pll lock bit instead?
-		frsky_channel_data[ch_index][1] = cc2500_read_reg(CC2500_FSCAL3);// & 0xCF);// ~FSCAL3_CHP_CURR_CAL_EN_msk); //set calibrated value, but disable charge-pump calibration bit
+		frsky_channel_data[ch_index][1] = cc2500_read_reg(CC2500_FSCAL3);// & ~FSCAL3_CHP_CURR_CAL_EN_msk); //set calibrated value, but disable charge-pump calibration bit
 		frsky_channel_data[ch_index][2] = cc2500_read_reg(CC2500_FSCAL2);
 		frsky_channel_data[ch_index][3] = cc2500_read_reg(CC2500_FSCAL1);
 		cc2500_strobe(CC2500_SIDLE);
@@ -531,6 +541,8 @@ void protocol_frsky_packet_rxed_callback(void)
 	}
 
 	//YAY! packet was probably valid, continue processing...
+	led_off(HARDWARE_LED_1);
+	led_on(HARDWARE_LED_2);
 	switch (frsky_state)
 	{
 		//expected packet and we goot it
@@ -558,6 +570,13 @@ void protocol_frsky_packet_rxed_callback(void)
 	}
 
 	frsky_last_rssi=(int16_t)(int8_t)packet[FRSKY_PKT_INX_RSSI(FRSKY_2W_TX_LENGTH)]-INT8_MIN;//save RSSI value, we might need it in telemetry packet
+	// uart_send_string_blocking("PKT: ");
+	uart_send_string_blocking(itoa(frsky_state-RX_PKT1,1));
+	uart_send_byte_blocking(',');
+	uart_send_string_blocking(itoa(frsky_last_rssi,1));
+	uart_send_byte_blocking(',');
+	uart_send_string_blocking(itoa(frsky_channel_data[frsky_channel_index][0],1));
+	uart_send_byte_blocking('\n');
 
 	if(frsky_last_rssi > FRSKY_RSSI_MAX && lna_state!=0 )//disable LNA if RSSI gets too high (RX saturation)
 	{
@@ -584,6 +603,7 @@ void protocol_frsky_packet_rxed_callback(void)
 	{
 		cc2500_mode_rx(lna_state);//set correct LNA state and set cc2500 to RX mode
 	}
+	led_off(HARDWARE_LED_2);
 }
 
 //when packet does not arrive
@@ -611,12 +631,14 @@ void protocol_frsky_packet_timeout_callback(void)
 			case RX_PKT1:
 			case RX_PKT2:
 			case RX_PKT3:
+				led_on(HARDWARE_LED_1);
 				swdt_restart(FRSKY_PACKET_TIMEOUT);//schedule tomeout for next packet
 				protocol_frsky_hop(1);//hop to nect channel to get ready for next packet
 				cc2500_mode_rx(lna_state);//back to rx
 				packets_lost++;
 				uart_send_string_blocking("TO ");
-				uart_send_string_blocking(itoa(frsky_state,1));
+				uart_send_string_blocking(itoa(frsky_state,2));
+				uart_send_string_blocking(itoa(frsky_channel_data[frsky_channel_index][0],4));
 				uart_send_string_blocking("\n");
 				break;
 
@@ -635,6 +657,8 @@ void protocol_frsky_packet_timeout_callback(void)
 
 void protocol_frsky_start(uint8_t force_bind)
 {
+	systick_blink_stop(HARDWARE_LED_1);
+	systick_blink_stop(HARDWARE_LED_2);
 	protocol_frsky_init();
 	//read config from flash
 	if( force_bind || protocol_frsky_read_nvm()<0 )//if no valid data found
@@ -642,6 +666,9 @@ void protocol_frsky_start(uint8_t force_bind)
 		protocol_frsky_calibrate_offset_start();
 		protocol_frsky_bind();
 		protocol_frsky_write_nvm();
+		systick_blink_set(HARDWARE_LED_1, 1, SYSTICK_1s);
+		systick_blink_set(HARDWARE_LED_2, 1, SYSTICK_1s);
+		delay_ms(1000);
 	}
 	else
 	{
@@ -678,8 +705,8 @@ void protocol_frsky_init(void)
 	// PATABLE(0) = 0xFF (+1dBm)
 	cc2500_write_reg(CC2500_PATABLE, 0xFF);
 	//FREQ_IF = 0x08 (IF = 203.125kHz)
-	cc2500_write_reg(CC2500_FSCTRL1, 8<<FSCTRL1_FREQ_IF_pos);
-	// there is some offset, determined ta binding time, but set it to 0 as default
+	cc2500_write_reg(CC2500_FSCTRL1, 6<<FSCTRL1_FREQ_IF_pos); //RF studio suggests 6
+	// there is some offset, determined at binding time, but set it to 0 as default
 	cc2500_write_reg(CC2500_FSCTRL0, 0);
 	//FREQ = 0x5C7627 (F = 2404MHz)
 	cc2500_write_reg(CC2500_FREQ2, 0x5C);
@@ -695,8 +722,12 @@ void protocol_frsky_init(void)
 	// Deviation = 31738Hz
 	cc2500_write_reg(CC2500_DEVIATN, 4<<DEVIATN_DEVIATION_E_pos | 2<<DEVIATN_DEVIATION_M_pos);
 	cc2500_write_reg(CC2500_BSCFG, 1<<BSCFG_BS_PRE_KI_pos | 2<<BSCFG_BS_PRE_KP_pos | 1<<BSCFG_BS_POST_KI_pos | 1<<BSCFG_BS_POST_KP_pos);
-	cc2500_write_reg(CC2500_AGCTRL2, 3<<AGCCTRL2_MAGN_TARGET_pos);
+	cc2500_write_reg(CC2500_AGCTRL2, 1<<AGCCTRL2_MAX_DVGA_GAIN_pos| 3<<AGCCTRL2_MAGN_TARGET_pos);
 	cc2500_write_reg(CC2500_AGCTRL1, AGCCTRL1_AGC_LNA_PRIORITY);
+	//from openTX project, works ok
+	// cc2500_write_reg(CC2500_AGCTRL2, 0x43 );
+	// cc2500_write_reg(CC2500_AGCTRL1, 0x40 );
+	// cc2500_write_reg(CC2500_AGCTRL0, 0x91 );
 
 	//TODO: check following settings
 	cc2500_write_reg(CC2500_FOCCFG, 0x16);

@@ -93,7 +93,7 @@
 	#define FRSKY_2ms					3000
 	#define FRSKY_1ms					1500
 
-	#define FRSKY_PACKETS_LOST_RESYNC_THRESHOLD	5 //number of consecutive packets lost to wait for total resync
+	#define FRSKY_PACKETS_LOST_RESYNC_THRESHOLD	10 //number of consecutive packets lost to wait for total resync
 	#define FRSKY_PACKET_TIMEOUT			(10*SWDT_1ms) //ms
 	#define FRSKY_CYCLE_TIMEOUT				(480*SWDT_1ms) //ms
 

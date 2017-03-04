@@ -95,8 +95,10 @@ BLburn: $(TARGET).hex softreset
 	$(eval PAGES_OCCUPIED = $(shell echo $(FLASH_OCCUPIED)/1024+2 |bc)) @#calculate how many pages are used (+ add some margin)
 	@echo bytes: $(FLASH_OCCUPIED), pages: $(PAGES_OCCUPIED)
 	@echo "FLASHING..."
-	stm32flash -m 8e1 -b 57600 -e $(PAGES_OCCUPIED) -v -w $< $(BLdev) @#erase only necessary amount of flash pages
-	stm32flash -m 8e1 -b 57600 -c -R $(BLdev) @#separate reset command, if previous flashing fails, it leaves device in BL mode, so we can investigate problem afterwards
+	@#erase only necessary amount of flash pages
+	stm32flash -m 8e1 -b 57600 -e $(PAGES_OCCUPIED) -v -w $< $(BLdev)
+	@#separate reset command, if previous flashing fails, it leaves device in BL mode, so we can investigate problem afterwards
+	stm32flash -m 8e1 -b 57600 -c -R $(BLdev)
 
 .PHONY: softreset
 softreset:

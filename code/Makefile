@@ -91,9 +91,12 @@ peek: $(TARGET).hex
 .PHONY: BLburn
 BLburn: $(TARGET).hex softreset
 	@echo "------------------BURN-using-BL-------------------"
-	@stm32flash -m 8e1 -b 57600 $(BLdev) > /dev/null | true #this is workaround, sometimes device init fails but second attempt was successful all the time during testing, increasing delay after soft reset does not help
+	$(eval FLASH_OCCUPIED = $(shell $(SIZE) -A $< |grep -i total|cut -c 6-)) @#get flash usage
+	$(eval PAGES_OCCUPIED = $(shell echo $(FLASH_OCCUPIED)/1024+2 |bc)) @#calculate how many pages are used (+ add some margin)
+	@echo bytes: $(FLASH_OCCUPIED), pages: $(PAGES_OCCUPIED)
 	@echo "FLASHING..."
-	stm32flash -m 8e1 -b 57600 -e 0 -w $< -R $(BLdev)
+	stm32flash -m 8e1 -b 57600 -e $(PAGES_OCCUPIED) -v -w $< $(BLdev) @#erase only necessary amount of flash pages
+	stm32flash -m 8e1 -b 57600 -c -R $(BLdev) @#separate reset command, if previous flashing fails, it leaves device in BL mode, so we can investigate problem afterwards
 
 .PHONY: softreset
 softreset:

@@ -571,12 +571,12 @@ void protocol_frsky_packet_rxed_callback(void)
 
 	frsky_last_rssi=(int16_t)(int8_t)packet[FRSKY_PKT_INX_RSSI(FRSKY_2W_TX_LENGTH)]-INT8_MIN;//save RSSI value, we might need it in telemetry packet
 	// uart_send_string_blocking("PKT: ");
-	uart_send_string_blocking(itoa(frsky_state-RX_PKT1,1));
-	uart_send_byte_blocking(',');
-	uart_send_string_blocking(itoa(frsky_last_rssi,1));
-	uart_send_byte_blocking(',');
-	uart_send_string_blocking(itoa(frsky_channel_data[frsky_channel_index][0],1));
-	uart_send_byte_blocking('\n');
+	// uart_send_string_blocking(itoa(frsky_state-RX_PKT1,1));
+	// uart_send_byte_blocking(',');
+	// uart_send_string_blocking(itoa(frsky_last_rssi,1));
+	// uart_send_byte_blocking(',');
+	// uart_send_string_blocking(itoa(frsky_channel_data[frsky_channel_index][0],1));
+	// uart_send_byte_blocking('\n');
 
 	if(frsky_last_rssi > FRSKY_RSSI_MAX && lna_state!=0 )//disable LNA if RSSI gets too high (RX saturation)
 	{
@@ -593,6 +593,7 @@ void protocol_frsky_packet_rxed_callback(void)
 	//set received data to ppm outputs
 	uint16_t channels[8];
 	protocol_frsky_extract(packet, channels);
+
 	ppm_set_ticks(FRSKY_1ms, FRSKY_2ms, channels);
 
 	if(frsky_state==TX_PKT)//what we will expect as next event

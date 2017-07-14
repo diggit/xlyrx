@@ -19,7 +19,7 @@
 #include "config.h"
 #include "misc.h"
 
-const struct SPI_SLAVE const SPI_SLAVE_LIST[]={
+const struct SPI_SLAVE SPI_SLAVE_LIST[]={
 	[CC2500_SPI_SLAVE_ID]={GPIOB,6},
 	// {GPIOA,4}
 };

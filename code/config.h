@@ -44,7 +44,7 @@
 	#define SWDT_F_IN				(F_CPU)
 
 	#define PPM_TRIG_F_IN			(F_APB1*2) //7.2 last note, LOL
-	#define PPM_TRIG_F_OUT			50//Hz
+	#define PPM_TRIG_F_OUT			200//Hz
 	#define PPM_TRIG_RESOLUTION_us	10//
 
 	#define PPM_CH_A_F_IN			(F_APB1*2) //7.2 last note, LOL
@@ -60,7 +60,7 @@
 		const uint8_t pin;
 	};
 	//configure SPI slaves in config.c
-	extern const struct SPI_SLAVE const SPI_SLAVE_LIST[];
+	extern const struct SPI_SLAVE SPI_SLAVE_LIST[];
 
 
 #endif

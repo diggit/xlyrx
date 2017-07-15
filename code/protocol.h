@@ -48,40 +48,40 @@
 
 
 	//packet TX->RX
-	#define FRSKY_2W_RX_LENGTH			17
-	#define FRSKY_2W_RX_TOTAL_LENGTH	(FRSKY_2W_RX_LENGTH+1+2)//+ 1 (LENGTH field) +2 RSSI and PQI
-	#define FRSKY_2W_RX_IDX_LENGTH		 0
-	#define FRSKY_2W_RX_IDX_TX_ADDR_H	 1
-	#define FRSKY_2W_RX_IDX_TX_ADDR_L	 2
-	#define FRSKY_2W_RX_IDX_PKT_ID		 3
-	#define FRSKY_2W_RX_IDX_UNKNOWN_1	 4
-	#define FRSKY_2W_RX_IDX_UNKNOWN_2	 5
+	#define FRSKY_D_RX_LENGTH			17
+	#define FRSKY_D_RX_TOTAL_LENGTH	(FRSKY_D_RX_LENGTH+1+2)//+ 1 (LENGTH field) +2 RSSI and PQI
+	#define FRSKY_D_RX_IDX_LENGTH		 0
+	#define FRSKY_D_RX_IDX_TX_ADDR_H	 1
+	#define FRSKY_D_RX_IDX_TX_ADDR_L	 2
+	#define FRSKY_D_RX_IDX_PKT_ID		 3
+	#define FRSKY_D_RX_IDX_UNKNOWN_1	 4
+	#define FRSKY_D_RX_IDX_UNKNOWN_2	 5
 	//ppm data
-	#define FRSKY_2W_RX_IDX_CH1_LSB		 6
-	#define FRSKY_2W_RX_IDX_CH2_LSB 	 7
-	#define FRSKY_2W_RX_IDX_CH3_LSB 	 8
-	#define FRSKY_2W_RX_IDX_CH4_LSB 	 9
-	#define FRSKY_2W_RX_IDX_CH12_MSB	10
-	#define FRSKY_2W_RX_IDX_CH34_MSB	11
-	#define FRSKY_2W_RX_IDX_CH5_LSB		12
-	#define FRSKY_2W_RX_IDX_CH6_LSB		13
-	#define FRSKY_2W_RX_IDX_CH7_LSB		14
-	#define FRSKY_2W_RX_IDX_CH8_LSB		15
-	#define FRSKY_2W_RX_IDX_CH56_MSB	16
-	#define FRSKY_2W_RX_IDX_CH78_MSB	17
+	#define FRSKY_D_RX_IDX_CH1_LSB		 6
+	#define FRSKY_D_RX_IDX_CH2_LSB 	 7
+	#define FRSKY_D_RX_IDX_CH3_LSB 	 8
+	#define FRSKY_D_RX_IDX_CH4_LSB 	 9
+	#define FRSKY_D_RX_IDX_CH12_MSB	10
+	#define FRSKY_D_RX_IDX_CH34_MSB	11
+	#define FRSKY_D_RX_IDX_CH5_LSB		12
+	#define FRSKY_D_RX_IDX_CH6_LSB		13
+	#define FRSKY_D_RX_IDX_CH7_LSB		14
+	#define FRSKY_D_RX_IDX_CH8_LSB		15
+	#define FRSKY_D_RX_IDX_CH56_MSB	16
+	#define FRSKY_D_RX_IDX_CH78_MSB	17
 
 	//packet RX->TX
-	#define FRSKY_2W_TX_LENGTH			17
-	#define FRSKY_2W_TX_IDX_LENGTH		 0
-	#define FRSKY_2W_TX_IDX_TX_ADDR_H	 1
-	#define FRSKY_2W_TX_IDX_TX_ADDR_L	 2
-	#define FRSKY_2W_TX_IDX_A1			 3
-	#define FRSKY_2W_TX_IDX_A2			 4
-	#define FRSKY_2W_TX_IDX_RX_RSSI		 5
+	#define FRSKY_D_TX_LENGTH			17
+	#define FRSKY_D_TX_IDX_LENGTH		 0
+	#define FRSKY_D_TX_IDX_TX_ADDR_H	 1
+	#define FRSKY_D_TX_IDX_TX_ADDR_L	 2
+	#define FRSKY_D_TX_IDX_A1			 3
+	#define FRSKY_D_TX_IDX_A2			 4
+	#define FRSKY_D_TX_IDX_RX_RSSI		 5
 	//rest of the packet are telemetry data
 
 	//delay between Rxed packet a Txing start of telemetry packet
-	#define FRSKY_2W_TX_DELAY			(1.5*SWDT_1ms) //ms
+	#define FRSKY_D_TX_DELAY			(1.5*SWDT_1ms) //ms
 
 	//TODO: implement external (UART) telemetry https://www.rcgroups.com/forums/showthread.php?2547257-FrSky-telemetry-hub-protocol-(on-air)
 

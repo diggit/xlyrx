@@ -109,7 +109,7 @@ void protocol_frsky_calibrate_offset_rxed_callback(void)
 	}
 	else
 	{
-		offset_cal_table[(uint8_t)offset_cal_table_idx]=packet[FRSKY_PKT_INX_RSSI(packet[FRSKY_BIND_INX_LENGTH])];
+		offset_cal_table[(uint8_t)offset_cal_table_idx]=packet[FRSKY_PKT_INX_RSSI(packet[FRSKY_D_BIND_INX_LENGTH])];
 		uart_send_string_blocking("OFS: ");
 		uart_send_string_blocking(itoa(offset_cal_table_idx,4));
 		uart_send_string_blocking(" RSSI: ");
@@ -144,8 +144,8 @@ void protocol_frsky_calibrate_offset_start(void)
 	cc2500_strobe(CC2500_SIDLE);
 	//TODO? use pin mode 0x01
 	cc2500_write_reg(CC2500_IOCFG0, 0x06);//GDO to indicate packet processing end
-	cc2500_write_reg(CC2500_ADDR, FRSKY_BIND_ADDRESS );//address in bind mode
-	cc2500_set_channel(FRSKY_BIND_CHANNEL);
+	cc2500_write_reg(CC2500_ADDR, FRSKY_D_BIND_ADDRESS );//address in bind mode
+	cc2500_set_channel(FRSKY_D_BIND_CHANNEL);
 
 	uint8_t MDMCFG4_backup = cc2500_read_reg(CC2500_MDMCFG4);//backup seetings
 	cc2500_write_reg(CC2500_MDMCFG4, 0xCA);//decrease channel width
@@ -297,7 +297,7 @@ volatile uint16_t frsky_hop_channels=0;
 
 volatile uint8_t frsky_channel_index=0;
 
-void protocol_frsky_bind_finished(void)
+void protocol_FRSKY_D_BIND_finished(void)
 {
 	cc2500_strobe(CC2500_SIDLE);//stop RX
 	cc2500_reset_callback(GDO0);
@@ -309,20 +309,20 @@ void protocol_frsky_bind_finished(void)
 	frsky_hop_channels=FRSKY_HOP_TABLE_VALID;
 }
 
-void protocol_frsky_bind_process_packet(void)
+void protocol_FRSKY_D_BIND_process_packet(void)
 {
 	uint8_t packet[64];
 	cc2500_read_fifo(packet);
 	uart_send_string_blocking("GRP:");
-	uart_send_string_blocking(itoa(packet[FRSKY_BIND_INX_HTI],3));
+	uart_send_string_blocking(itoa(packet[FRSKY_D_BIND_INX_HTI],3));
 	uart_send_string_blocking("LEN:");
-	uart_send_string_blocking(itoa(packet[FRSKY_BIND_INX_LENGTH],3));
+	uart_send_string_blocking(itoa(packet[FRSKY_D_BIND_INX_LENGTH],3));
 	uart_send_byte_blocking('\n');
 	uart_send_byte_blocking('\n');
 	//parse TX ID
 	union frsky_id IDbuff;
-	IDbuff.nibble.high=packet[FRSKY_BIND_INX_TX_ADDR_H];
-	IDbuff.nibble.low=packet[FRSKY_BIND_INX_TX_ADDR_L];
+	IDbuff.nibble.high=packet[FRSKY_D_BIND_INX_TX_ADDR_H];
+	IDbuff.nibble.low=packet[FRSKY_D_BIND_INX_TX_ADDR_L];
 
 	if(frsky_tx_id.id==0)
 	{
@@ -335,17 +335,17 @@ void protocol_frsky_bind_process_packet(void)
 	if(frsky_tx_id.id==IDbuff.id)
 	{
 		if(frsky_hop_channels==FRSKY_HOP_TABLE_COMPLETE)
-			protocol_frsky_bind_finished();
+			protocol_FRSKY_D_BIND_finished();
 		else
 		{
 			//parse
 			for(uint8_t index=0; index<5; index++)
 			{
-				uint8_t hti=packet[FRSKY_BIND_INX_HTI];
+				uint8_t hti=packet[FRSKY_D_BIND_INX_HTI];
 				if(hti+index < FRSKY_CHANNEL_COUNT)
-					frsky_channel_data[hti+index][0]=packet[FRSKY_BIND_INX_HOP1+index];//save channel number to channel config table
+					frsky_channel_data[hti+index][0]=packet[FRSKY_D_BIND_INX_HOP1+index];//save channel number to channel config table
 			}
-			frsky_hop_channels|=(1<<(packet[FRSKY_BIND_INX_HTI]/5));//mark group as set
+			frsky_hop_channels|=(1<<(packet[FRSKY_D_BIND_INX_HTI]/5));//mark group as set
 		}
 	}
 
@@ -354,16 +354,16 @@ void protocol_frsky_bind_process_packet(void)
 void protocol_frsky_bind(void)
 {
 	uart_send_string_blocking("BINDING...\n");
-	frsky_tx_id.id=0;//protocol_frsky_bind_process_packet will parse ID when frsky_tx_id.id==0 or matching non zero value -> clear value to zero
+	frsky_tx_id.id=0;//protocol_FRSKY_D_BIND_process_packet will parse ID when frsky_tx_id.id==0 or matching non zero value -> clear value to zero
 	frsky_hop_channels=0;
 	cc2500_strobe(CC2500_SIDLE);
 	cc2500_write_reg(CC2500_FIFOTHR, 7);//more bytes than correct packet in RXFIFO to trigger -> triggered only by correct packets received, this way, we have least false positive interrupts from cc2500
 	cc2500_write_reg(CC2500_IOCFG0, 0x01);//GDO to indicate packet processing end (or RXFIFO threshold crossed)
-	cc2500_write_reg(CC2500_ADDR, FRSKY_BIND_ADDRESS );//address in bind mode
-	cc2500_set_channel(FRSKY_BIND_CHANNEL);//all binding happens on channel 0 :/
+	cc2500_write_reg(CC2500_ADDR, FRSKY_D_BIND_ADDRESS );//address in bind mode
+	cc2500_set_channel(FRSKY_D_BIND_CHANNEL);//all binding happens on channel 0 :/
 	cc2500_strobe(CC2500_SCAL);//calibrate for this frequency (just for sure if no autocal enabled)
 	delay_ms(1);//I hope it is enough, polling MARCSTATE fro IDLE state is the other way
-	cc2500_set_callback(GDO0, RISING, protocol_frsky_bind_process_packet, NOT_EMPTY);//set callback on GDO0
+	cc2500_set_callback(GDO0, RISING, protocol_FRSKY_D_BIND_process_packet, NOT_EMPTY);//set callback on GDO0
 	cc2500_strobe(CC2500_SRX);
 
 	led_on(HARDWARE_LED_2);
@@ -429,37 +429,37 @@ void protocol_frsky_hop(uint8_t hops)
 void protocol_frsky_extract(uint8_t *packet,uint16_t *channel_buffer)
 {
 	channel_buffer[0]=\
-	((uint16_t)FRSKY_EXTRACT_LOWER(packet[FRSKY_2W_RX_IDX_CH12_MSB])<<8)|\
-	((uint16_t)packet[FRSKY_2W_RX_IDX_CH1_LSB]);
+	((uint16_t)FRSKY_EXTRACT_LOWER(packet[FRSKY_D_RX_IDX_CH12_MSB])<<8)|\
+	((uint16_t)packet[FRSKY_D_RX_IDX_CH1_LSB]);
 
 	channel_buffer[1]=\
-	((uint16_t)FRSKY_EXTRACT_HIGHER(packet[FRSKY_2W_RX_IDX_CH12_MSB])<<8)|\
-	((uint16_t)packet[FRSKY_2W_RX_IDX_CH2_LSB]);
+	((uint16_t)FRSKY_EXTRACT_HIGHER(packet[FRSKY_D_RX_IDX_CH12_MSB])<<8)|\
+	((uint16_t)packet[FRSKY_D_RX_IDX_CH2_LSB]);
 
 	channel_buffer[2]=\
-	((uint16_t)FRSKY_EXTRACT_LOWER(packet[FRSKY_2W_RX_IDX_CH34_MSB])<<8)|\
-	((uint16_t)packet[FRSKY_2W_RX_IDX_CH3_LSB]);
+	((uint16_t)FRSKY_EXTRACT_LOWER(packet[FRSKY_D_RX_IDX_CH34_MSB])<<8)|\
+	((uint16_t)packet[FRSKY_D_RX_IDX_CH3_LSB]);
 
 	channel_buffer[3]=\
-	((uint16_t)FRSKY_EXTRACT_HIGHER(packet[FRSKY_2W_RX_IDX_CH34_MSB])<<8)|\
-	((uint16_t)packet[FRSKY_2W_RX_IDX_CH4_LSB]);
+	((uint16_t)FRSKY_EXTRACT_HIGHER(packet[FRSKY_D_RX_IDX_CH34_MSB])<<8)|\
+	((uint16_t)packet[FRSKY_D_RX_IDX_CH4_LSB]);
 
 
 	channel_buffer[4]=\
-	((uint16_t)FRSKY_EXTRACT_LOWER(packet[FRSKY_2W_RX_IDX_CH56_MSB])<<8)|\
-	((uint16_t)packet[FRSKY_2W_RX_IDX_CH5_LSB]);
+	((uint16_t)FRSKY_EXTRACT_LOWER(packet[FRSKY_D_RX_IDX_CH56_MSB])<<8)|\
+	((uint16_t)packet[FRSKY_D_RX_IDX_CH5_LSB]);
 
 	channel_buffer[5]=\
-	((uint16_t)FRSKY_EXTRACT_HIGHER(packet[FRSKY_2W_RX_IDX_CH56_MSB])<<8)|\
-	((uint16_t)packet[FRSKY_2W_RX_IDX_CH6_LSB]);
+	((uint16_t)FRSKY_EXTRACT_HIGHER(packet[FRSKY_D_RX_IDX_CH56_MSB])<<8)|\
+	((uint16_t)packet[FRSKY_D_RX_IDX_CH6_LSB]);
 
 	channel_buffer[6]=\
-	((uint16_t)FRSKY_EXTRACT_LOWER(packet[FRSKY_2W_RX_IDX_CH78_MSB])<<8)|\
-	((uint16_t)packet[FRSKY_2W_RX_IDX_CH7_LSB]);
+	((uint16_t)FRSKY_EXTRACT_LOWER(packet[FRSKY_D_RX_IDX_CH78_MSB])<<8)|\
+	((uint16_t)packet[FRSKY_D_RX_IDX_CH7_LSB]);
 
 	channel_buffer[7]=\
-	((uint16_t)FRSKY_EXTRACT_HIGHER(packet[FRSKY_2W_RX_IDX_CH78_MSB])<<8)|\
-	((uint16_t)packet[FRSKY_2W_RX_IDX_CH8_LSB]);
+	((uint16_t)FRSKY_EXTRACT_HIGHER(packet[FRSKY_D_RX_IDX_CH78_MSB])<<8)|\
+	((uint16_t)packet[FRSKY_D_RX_IDX_CH8_LSB]);
 }
 
 //describes expected event
@@ -477,20 +477,20 @@ volatile uint8_t frsky_last_rssi=0;
 
 void protocol_frsky_packet_send(void)
 {
-	swdt_restart(FRSKY_2W_TX_DELAY);//delay between RXED and TXING
+	swdt_restart(FRSKY_D_TX_DELAY);//delay between RXED and TXING
 
 	cc2500_strobe(CC2500_SIDLE);
 	cc2500_strobe(CC2500_SFTX);//flush TX buffer, should not be necessary
 	cc2500_strobe(CC2500_SFRX);//flush RX buffer, should not be necessary
-	uint8_t packet[FRSKY_2W_TX_LENGTH+1]={0};
+	uint8_t packet[FRSKY_D_TX_LENGTH+1]={0};
 
-	packet[FRSKY_2W_TX_IDX_LENGTH]=FRSKY_2W_TX_LENGTH;
-	packet[FRSKY_2W_TX_IDX_TX_ADDR_H]=frsky_tx_id.nibble.high;
-	packet[FRSKY_2W_TX_IDX_TX_ADDR_L]=frsky_tx_id.nibble.low;
-	packet[FRSKY_2W_TX_IDX_A1]=adc_measure_single_blocking(4)>>4;//12bit ADC, but only 8bit data space :(
-	packet[FRSKY_2W_TX_IDX_A2]=adc_measure_single_blocking(5)>>4;
-	packet[FRSKY_2W_TX_IDX_RX_RSSI]=frsky_last_rssi/2;
-	cc2500_write_fifo(packet, FRSKY_2W_TX_LENGTH+1);
+	packet[FRSKY_D_TX_IDX_LENGTH]=FRSKY_D_TX_LENGTH;
+	packet[FRSKY_D_TX_IDX_TX_ADDR_H]=frsky_tx_id.nibble.high;
+	packet[FRSKY_D_TX_IDX_TX_ADDR_L]=frsky_tx_id.nibble.low;
+	packet[FRSKY_D_TX_IDX_A1]=adc_measure_single_blocking(4)>>4;//12bit ADC, but only 8bit data space :(
+	packet[FRSKY_D_TX_IDX_A2]=adc_measure_single_blocking(5)>>4;
+	packet[FRSKY_D_TX_IDX_RX_RSSI]=frsky_last_rssi/2;
+	cc2500_write_fifo(packet, FRSKY_D_TX_LENGTH+1);
 }
 
 volatile uint8_t packets_lost=0;
@@ -508,9 +508,9 @@ void protocol_frsky_packet_rxed_callback(void)
 {
 	uint8_t bytes=cc2500_read_reg(CC2500_RXBYTES);
 
-	if(bytes!=FRSKY_2W_RX_TOTAL_LENGTH)
+	if(bytes!=FRSKY_D_RX_TOTAL_LENGTH)
 	{
-		if(bytes>FRSKY_2W_RX_TOTAL_LENGTH)
+		if(bytes>FRSKY_D_RX_TOTAL_LENGTH)
 		{
 			cc2500_strobe(CC2500_SIDLE);
 			cc2500_strobe(CC2500_SFRX);
@@ -532,8 +532,8 @@ void protocol_frsky_packet_rxed_callback(void)
 	uint8_t packet[64];
 	bytes = cc2500_read_fifo(packet);
 
-	if(	packet[FRSKY_2W_RX_IDX_TX_ADDR_H]!=frsky_tx_id.nibble.high ||\
-		packet[FRSKY_2W_RX_IDX_TX_ADDR_L]!=frsky_tx_id.nibble.low)
+	if(	packet[FRSKY_D_RX_IDX_TX_ADDR_H]!=frsky_tx_id.nibble.high ||\
+		packet[FRSKY_D_RX_IDX_TX_ADDR_L]!=frsky_tx_id.nibble.low)
 	{
 		uart_send_string_blocking("TXID mismatch!\n");
 		//kinda WTF, packet passed address: test, CRC check, length check and second byte of address is not matching?!
@@ -562,14 +562,14 @@ void protocol_frsky_packet_rxed_callback(void)
 	}
 
 	//sync state machine with packet from packet id 0,1,2,(3),4,5,6,(7),...
-	uint8_t newstate=packet[FRSKY_2W_RX_IDX_PKT_ID]%4 + RX_PKT1 +1;
+	uint8_t newstate=packet[FRSKY_D_RX_IDX_PKT_ID]%4 + RX_PKT1 +1;
 	if(frsky_state != newstate)
 	{
 		// uart_send_string_blocking("Qs ");
 		frsky_state = newstate;
 	}
 
-	frsky_last_rssi=(int16_t)(int8_t)packet[FRSKY_PKT_INX_RSSI(FRSKY_2W_TX_LENGTH)]-INT8_MIN;//save RSSI value, we might need it in telemetry packet
+	frsky_last_rssi=(int16_t)(int8_t)packet[FRSKY_PKT_INX_RSSI(FRSKY_D_TX_LENGTH)]-INT8_MIN;//save RSSI value, we might need it in telemetry packet
 	// uart_send_string_blocking("PKT: ");
 	// uart_send_string_blocking(itoa(frsky_state-RX_PKT1,1));
 	// uart_send_byte_blocking(',');
@@ -645,7 +645,7 @@ void protocol_frsky_packet_timeout_callback(void)
 
 			case TX_PKT://time to send telemetry packet
 				cc2500_mode_tx();//send prepaired packet
-				swdt_restart(2*FRSKY_PACKET_TIMEOUT-FRSKY_2W_TX_DELAY);//schedule next TO for next pkt, subtract time we waited before TXing
+				swdt_restart(2*FRSKY_PACKET_TIMEOUT-FRSKY_D_TX_DELAY);//schedule next TO for next pkt, subtract time we waited before TXing
 				cc2500_set_callback(GDO2, RISING, protocol_frsky_packet_send_finished, NONE);
 				frsky_state=RX_PKT1;
 				break;

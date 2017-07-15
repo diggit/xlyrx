@@ -25,21 +25,21 @@
 	#define FRSKY_CHANNEL_COUNT			47
 
 	//TX->RX BIND packets
-	#define FRSKY_BIND_INX_LENGTH		 0
-	#define FRSKY_BIND_INX_ADDR_H		 1
-	#define FRSKY_BIND_INX_ADDR_L		 2
-	#define FRSKY_BIND_INX_TX_ADDR_H	 3
-	#define FRSKY_BIND_INX_TX_ADDR_L	 4
-	#define FRSKY_BIND_INX_HTI			 5
-	#define FRSKY_BIND_INX_HOP1			 6
-	#define FRSKY_BIND_INX_HOP2			 7
-	#define FRSKY_BIND_INX_HOP3			 8
-	#define FRSKY_BIND_INX_HOP4			 9
-	#define FRSKY_BIND_INX_HOP5			10
+	#define FRSKY_D_BIND_INX_LENGTH		 0
+	#define FRSKY_D_BIND_INX_ADDR_H		 1
+	#define FRSKY_D_BIND_INX_ADDR_L		 2
+	#define FRSKY_D_BIND_INX_TX_ADDR_H	 3
+	#define FRSKY_D_BIND_INX_TX_ADDR_L	 4
+	#define FRSKY_D_BIND_INX_HTI		 5
+	#define FRSKY_D_BIND_INX_HOP1		 6
+	#define FRSKY_D_BIND_INX_HOP2		 7
+	#define FRSKY_D_BIND_INX_HOP3		 8
+	#define FRSKY_D_BIND_INX_HOP4		 9
+	#define FRSKY_D_BIND_INX_HOP5		10
 	//unknown/empty 7 bytes
 
-	#define FRSKY_BIND_CHANNEL			 0
-	#define FRSKY_BIND_ADDRESS			 3
+	#define FRSKY_D_BIND_CHANNEL		 0
+	#define FRSKY_D_BIND_ADDRESS		 3
 
 
 	//RSSI and PQI are not in PKT length (added by RX cc2500)
@@ -58,17 +58,17 @@
 	#define FRSKY_D_RX_IDX_UNKNOWN_2	 5
 	//ppm data
 	#define FRSKY_D_RX_IDX_CH1_LSB		 6
-	#define FRSKY_D_RX_IDX_CH2_LSB 	 7
-	#define FRSKY_D_RX_IDX_CH3_LSB 	 8
-	#define FRSKY_D_RX_IDX_CH4_LSB 	 9
-	#define FRSKY_D_RX_IDX_CH12_MSB	10
-	#define FRSKY_D_RX_IDX_CH34_MSB	11
+	#define FRSKY_D_RX_IDX_CH2_LSB 		 7
+	#define FRSKY_D_RX_IDX_CH3_LSB 		 8
+	#define FRSKY_D_RX_IDX_CH4_LSB 		 9
+	#define FRSKY_D_RX_IDX_CH12_MSB		10
+	#define FRSKY_D_RX_IDX_CH34_MSB		11
 	#define FRSKY_D_RX_IDX_CH5_LSB		12
 	#define FRSKY_D_RX_IDX_CH6_LSB		13
 	#define FRSKY_D_RX_IDX_CH7_LSB		14
 	#define FRSKY_D_RX_IDX_CH8_LSB		15
-	#define FRSKY_D_RX_IDX_CH56_MSB	16
-	#define FRSKY_D_RX_IDX_CH78_MSB	17
+	#define FRSKY_D_RX_IDX_CH56_MSB		16
+	#define FRSKY_D_RX_IDX_CH78_MSB		17
 
 	//packet RX->TX
 	#define FRSKY_D_TX_LENGTH			17
